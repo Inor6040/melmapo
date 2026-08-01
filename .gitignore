@@ -1,0 +1,24 @@
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Config local / secretos
+.env
+*.local
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
+
+# Resultados de escaneo (no versionar salidas de laboratorio)
+/output/
+*.json.local
