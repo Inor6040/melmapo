@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "melmapo"
 version = "0.0.1"
-description = "Herramienta de enumeracion y escaneo de red, hosts y servicios (TFM)"
+description = "Enumeracion y escaneo en LAN con correlacion fingerprint-CVE en tiempo de escaneo (TFM)"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "GPL-3.0-only" }
