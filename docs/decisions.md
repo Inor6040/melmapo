@@ -1,181 +1,303 @@
 # Registro de decisiones técnicas
 
-Formato de cada entrada: **Problema → Alternativas consideradas → Criterios de evaluación →
-Decisión → Consecuencias y limitaciones asumidas.**
-
-Este documento se referencia como anexo en la memoria (capítulo 5, Desarrollo de la
-herramienta) y se actualiza con cada decisión relevante a lo largo del proyecto.
+Este documento recoge las decisiones de diseño e implementación tomadas durante el desarrollo de
+Melmapo. Cada entrada describe el problema de partida, las alternativas que se valoraron, los
+criterios aplicados, la decisión adoptada y las consecuencias que se aceptan al tomarla. Se
+incluye como anexo de la memoria, en el capítulo dedicado al desarrollo de la herramienta.
 
 ---
 
 ## 001 — Lenguaje de implementación
 
-- **Problema:** elegir el lenguaje principal de la herramienta.
-- **Alternativas:** Python 3.11+, Go, Rust, C#.
-- **Criterios:** madurez del ecosistema específico del dominio (librerías de red y protocolos
-  ofensivos), soporte de concurrencia asíncrona para operaciones intensivas en E/S de red,
-  portabilidad multiplataforma, alineación con el estándar de facto del tooling ofensivo.
-- **Decisión:** Python 3.11+. El enunciado del TFM recomienda explícitamente Python con Scapy
-  o PowerShell, lo que refuerza la elección.
-- **Consecuencias asumidas:** menor rendimiento bruto frente a implementaciones compiladas
-  (Go, Rust). Mitigación prevista: `asyncio` para E/S concurrente y, si el perfilado del
-  capítulo 6 lo justifica, delegación de rutas críticas en binarios optimizados. Se descarta
-  C# porque su ventaja competitiva (integración nativa Windows/.NET, ejecución en memoria) es
-  relevante para post-explotación en Active Directory, no para enumeración multiplataforma.
+La primera decisión del proyecto era el lenguaje. Se valoraron Python, Go, Rust y C#.
+
+Go y Rust ofrecen un rendimiento muy superior en operaciones de red intensivas, pero su ecosistema
+de librerías orientadas a la manipulación de paquetes en crudo es considerablemente más pobre que
+el de Python, y la curva de desarrollo es más lenta. C# resultaba atractivo por su integración
+nativa con Windows, aunque esa ventaja se manifiesta sobre todo en herramientas de post-explotación
+en entornos Active Directory: para una herramienta de enumeración que debe operar contra objetivos
+heterogéneos, aporta poco.
+
+Python reúne, en cambio, un conjunto de librerías maduro y específico del dominio —Scapy en primer
+lugar—, permite iterar con rapidez sobre el diseño y constituye el estándar de facto en el
+instrumental ofensivo, lo que facilita que terceros lean, comprendan y extiendan el código. El
+propio enunciado del trabajo lo recomienda de forma explícita.
+
+**Se opta por Python 3.11 o superior.** Se acepta como contrapartida un rendimiento bruto inferior
+al de una implementación compilada, penalización que resulta poco relevante en el escenario
+objetivo, una red de área local con un número acotado de equipos. Conviene señalar que la
+justificación inicial apelaba también a las capacidades de concurrencia asíncrona del lenguaje;
+ese argumento quedó matizado más adelante por la decisión 006b, al comprobarse que la dependencia
+de Scapy impone un modelo basado en hilos.
 
 ---
 
 ## 002 — Licencia
 
-- **Problema:** elegir licencia para un repositorio público de una herramienta ofensiva.
-- **Alternativas:** MIT, Apache 2.0, GPLv3, AGPLv3.
-- **Criterios:** coherencia con el ecosistema de referencia (nmap es GPLv2; buena parte del
-  tooling ofensivo relevante usa copyleft), garantizar que las mejoras de terceros reviertan a
-  la comunidad, simplicidad frente a AGPLv3 (pensada para software como servicio, no aplica
-  bien a un CLI de ejecución local).
-- **Decisión:** GPLv3.
-- **Consecuencias asumidas:** restringe el empaquetado en productos comerciales cerrados sin
-  liberar el código derivado. No entra en conflicto con los objetivos del proyecto.
+Para un repositorio público que aloja una herramienta de seguridad ofensiva se consideraron MIT,
+Apache 2.0, GPLv3 y AGPLv3.
+
+Las licencias permisivas facilitan la adopción, pero no garantizan que las mejoras introducidas por
+terceros reviertan a la comunidad. AGPLv3 fue descartada por inadecuación: su cláusula de uso en
+red está pensada para software ofrecido como servicio, no para una herramienta de línea de comandos
+que se ejecuta localmente. Pesó además la coherencia con el ecosistema: nmap se distribuye bajo
+GPLv2 y buena parte del instrumental de referencia emplea licencias copyleft.
+
+**Se adopta GPLv3.** La consecuencia es que la herramienta no podrá integrarse en productos
+comerciales cerrados sin liberar el código derivado, lo que no supone conflicto alguno con los
+fines del proyecto.
 
 ---
 
 ## 003 — Alcance de la superficie objetivo
 
-- **Problema:** delimitar qué enumera y escanea la herramienta.
-- **Alternativas:** red/hosts + servicios; web; DNS/OSINT; Active Directory; multi-superficie.
-- **Criterios:** conformidad con el enunciado del TFM (que fija explícitamente "red de área
-  local, pentesting interno de sistemas"), viabilidad en el plazo disponible, posibilidad de
-  medir la hipótesis en banco de pruebas controlado.
-- **Decisión:** red/hosts + servicios en red de área local.
-- **Consecuencias asumidas:** es el terreno más ocupado por herramientas de referencia
-  (nmap, masscan, rustscan), lo que obliga a una aportación diferencial explícita — ver 004.
+Una herramienta de reconocimiento puede orientarse a superficies muy distintas: la red y sus
+equipos, la capa web, la información expuesta mediante DNS y fuentes abiertas, o los servicios de
+directorio. También cabía una aproximación multi-superficie.
+
+El enunciado del trabajo resuelve buena parte de la cuestión al circunscribir el ámbito de
+actuación a la red de área local, en un contexto de pentesting interno de sistemas. A ello se suma
+un criterio de orden metodológico: la superficie elegida debe permitir contrastar la hipótesis
+contra un estado real conocido, lo que resulta mucho más viable con equipos y servicios de red que
+con superficies donde el resultado esperado es difícil de establecer de antemano.
+
+**El alcance se fija en el descubrimiento de equipos y la enumeración de sus servicios dentro de
+una red de área local.** Se asume que se trata del terreno más transitado por herramientas
+consolidadas, circunstancia que obliga a que la validación descanse sobre evidencia medida y no
+sobre apreciaciones cualitativas.
 
 ---
 
-## 004 — Aportación diferencial e hipótesis del TFM
+## 004 — Hipótesis del trabajo
 
-- **Problema:** qué aporta esta herramienta sobre nmap/masscan/rustscan, de forma falsable y
-  medible.
-- **Alternativas consideradas:**
-  1. Correlación activa fingerprinting de servicio ↔ CVEs conocidos en tiempo de escaneo.
-  2. Motor de detección adaptativo que ajusta agresividad/paralelismo según señales de red.
-  3. Salida nativa estructurada (JSON/SARIF) orientada a integración en pipelines CI/CD.
-- **Criterios:** falsabilidad, medibilidad en banco de pruebas controlado (capítulo 6),
-  diferenciación real frente a herramientas de referencia, encaje con el apartado del enunciado
-  que valora positivamente aportaciones adicionales en fingerprinting y enumeración.
-- **Decisión:** opción 1. **Hipótesis:** correlacionar activamente el fingerprinting de
-  servicio con CVEs conocidos durante el propio escaneo reduce el tiempo hasta un *hallazgo
-  accionable* frente al flujo de referencia nmap + NSE + búsqueda manual en NVD.
-- **Definición operacional de "hallazgo accionable"** (imprescindible para que la hipótesis sea
-  medible y no meramente cualitativa): intervalo entre el fin de la identificación de un
-  servicio y la presentación del primer par (servicio, CVE) con severidad y referencia
-  verificable.
-- **Consecuencias asumidas:** la hipótesis depende de la disponibilidad de una fuente de datos
-  CVE fiable y de baja latencia (ver 007). La correlación es una capa *sobre* los requisitos
-  mínimos del enunciado, nunca un sustituto de ellos (ver 008).
+Formular la hipótesis exigía encontrar un enunciado que fuera a la vez falsable y demostrable con
+los medios del laboratorio. Se barajaron tres.
+
+La primera planteaba comparar la precisión de la herramienta con la de una implementación de
+referencia. La segunda proponía correlacionar el fingerprinting obtenido con bases de datos de
+vulnerabilidades durante el propio escaneo, midiendo la reducción del tiempo hasta obtener un
+hallazgo accionable. La tercera apuntaba a un motor capaz de ajustar su agresividad según las
+condiciones observadas de la red.
+
+La segunda y la tercera resultaban más originales, pero ambas trasladaban el peso de la
+demostración fuera de lo que el enunciado exige: la segunda dependía de una fuente externa de datos
+cuya disponibilidad y latencia condicionaban la medición, y la tercera requería inducir condiciones
+de red degradadas de forma reproducible, algo difícil de garantizar en un entorno virtualizado. La
+primera, en cambio, se apoya íntegramente en las técnicas que el trabajo debe implementar de todos
+modos, y admite una contrastación numérica limpia.
+
+**La hipótesis queda formulada así:** una implementación propia de las técnicas de descubrimiento,
+escaneo y fingerprinting recogidas en el enunciado alcanza una precisión equivalente a la de nmap
+en la clasificación de estados de puerto —abierto, cerrado y filtrado— y en la diferenciación entre
+sistemas Windows y Linux, sobre un mismo banco de pruebas en entorno controlado y con un coste
+temporal acotado.
+
+Su contrastación se realiza midiendo verdaderos y falsos positivos y negativos contra la tabla de
+estado real del laboratorio descrita en la decisión 010, empleando nmap como referencia y repitiendo
+cada medición un mínimo de cinco veces para poder reportar media y desviación típica. Se asume que
+la hipótesis es conservadora: no aspira a superar a la herramienta de referencia, sino a demostrar
+equivalencia funcional en un subconjunto acotado de técnicas.
 
 ---
 
 ## 005 — Arquitectura
 
-- **Problema:** CLI monolítica frente a núcleo modular, con o sin sistema de plugins.
-- **Criterios:** la hipótesis (004) requiere que fingerprinting y correlación operen acoplados
-  en el flujo de escaneo, pero deben poder probarse por separado en el capítulo 6 (p. ej.
-  sustituir la fuente CVE por un doble de prueba sin tocar el fingerprinting); el plazo
-  disponible penaliza la complejidad no esencial.
-- **Decisión:** núcleo modular con separación `core / discovery / scanning / fingerprint /
-  correlation / output`, sin capa de plugins de terceros.
-- **Consecuencias asumidas:** menor extensibilidad por terceros a corto plazo que un sistema de
-  plugins. Se declara explícitamente como limitación en las conclusiones y se propone como
-  línea futura (capítulo 7).
+La alternativa era entre una herramienta monolítica de línea de comandos y un núcleo dividido en
+módulos, con la opción adicional de incorporar un sistema de extensiones de terceros.
+
+Dos consideraciones inclinaron la balanza. La primera, de orden experimental: el banco de pruebas
+debe poder ejercitar cada técnica de forma aislada, lo que exige que estén separadas y sean
+invocables de manera independiente. La segunda, de orden expositivo: una correspondencia directa
+entre los requisitos del enunciado y las unidades de código hace verificable esa correspondencia,
+tanto en la memoria como durante la defensa.
+
+**Se adopta un núcleo modular** organizado en `core`, `discovery`, `scanning`, `fingerprint`,
+`correlation` y `output`. Se prescinde del sistema de extensiones: aportaría flexibilidad para
+terceros, pero introduce una capa de indirección que no beneficia a los objetivos del trabajo y
+dificulta seguir el flujo de ejecución al leer el código. Queda recogido entre las líneas futuras.
+El paquete `correlation` se mantiene reservado en la estructura, sin implementación, conforme a lo
+expuesto en la decisión 007.
 
 ---
 
-## 006 — [PENDIENTE] Modelo de concurrencia y formato de salida
+## 006 — Formato de salida
 
-- **Problema:** modelo de concurrencia para el escaneo y formato de serialización de resultados.
-- **Alternativas de salida:** JSON propio, SARIF, HTML, combinación.
-- **Dependencias:** condicionado por 007 (si la consulta CVE es remota, impacta el modelo de
-  concurrencia y la latencia medida en la métrica de 004).
-- **Estado:** sin decidir.
+Los resultados de un escaneo tienen dos consumidores distintos: el operador que está frente a la
+consola mientras la herramienta trabaja, y cualquier proceso posterior que necesite explotar esos
+datos. Servir a ambos con un único formato obliga a comprometer uno de los dos.
 
----
+Se valoraron JSON, SARIF, HTML, CSV y la salida exclusiva por consola. SARIF se descartó por
+inadecuación conceptual: está diseñado para hallazgos de análisis estático de código y su
+aplicación a resultados de escaneo de red exigiría forzar el mapeo de los campos. HTML y CSV no
+aportan nada que JSON no cubra ya, y su generación desviaría esfuerzo de la validación
+experimental.
 
-## 007 — [PENDIENTE] Fuente de datos CVE
-
-- **Problema:** de dónde obtiene la herramienta los CVEs para correlacionar durante el escaneo.
-- **Alternativas:** API de NVD en vivo; mirror local del feed JSON de NVD; `cve-search`/CIRCL
-  autoalojado.
-- **Criterios:** determinismo y reproducibilidad del banco de pruebas (depender de un servicio
-  externo el día de la defensa es un riesgo operativo), latencia (impacta directamente la
-  métrica de "hallazgo accionable" de 004), límites de tasa de la API pública de NVD.
-- **Estado:** sin decidir. Recomendación provisional: mirror local versionado con fecha de
-  snapshot documentada, para garantizar reproducibilidad. Debe cerrarse antes de implementar
-  el módulo `correlation`.
+**Se implementa una salida doble:** serialización a JSON en fichero, con una estructura que refleja
+fielmente el modelo de datos del núcleo, y presentación en tabla legible por consola durante la
+ejecución. Los formatos descartados quedan como línea futura.
 
 ---
 
-## 008 — Prioridad de implementación: mínimo del enunciado frente a aportación diferencial
+## 006b — Modelo de concurrencia
 
-- **Problema:** el enunciado del TFM exige un conjunto cerrado de técnicas (ARP/TCP/UDP/ICMP
-  Ping, SYN Scan, TCP Connect, ACK Scan, banner grabbing, cabeceras HTTP, detección de SO).
-  La aportación diferencial (004) es adicional a ese conjunto y compite por el mismo tiempo
-  de desarrollo.
-- **Riesgo identificado:** que la correlación CVE absorba el esfuerzo y deje las técnicas
-  exigidas incompletas o insuficientemente probadas, penalizando la evaluación sobre los
-  criterios explícitos del enunciado para ganar en un criterio meramente valorable.
-- **Decisión:** los seis requisitos funcionales mínimos se implementan y validan **antes** de
-  desarrollar el módulo `correlation`. La correlación CVE se construye sobre un `fingerprint/`
-  ya funcional y probado, no en paralelo.
-- **Consecuencias asumidas:** si el plazo se comprime, la aportación diferencial se degrada de
-  forma controlada (p. ej. correlación sobre un subconjunto reducido de servicios) sin
-  comprometer el cumplimiento del enunciado. Esta degradación, de producirse, se documenta en
-  las limitaciones del capítulo 7.
+El escaneo de red es una carga dominada por la espera: la mayor parte del tiempo transcurre
+aguardando respuestas que pueden no llegar. Paralelizar es, por tanto, imprescindible.
 
----
+La opción inicialmente prevista era `asyncio`, pero choca con una limitación de Scapy: sus
+primitivas de envío y recepción son síncronas y bloqueantes, y no se integran con el bucle de
+eventos sin recurrir a envoltorios que anulan buena parte de la ventaja. Cabía un modelo híbrido,
+con hilos para las técnicas basadas en Scapy y corrutinas para las basadas en sockets estándar,
+pero mantener dos paradigmas de concurrencia simultáneos supone duplicar la gestión de errores y de
+cancelaciones, y multiplicar las formas en que el programa puede fallar de manera difícil de
+diagnosticar.
 
-## 009 — [PENDIENTE] Privilegios de ejecución y dependencias de captura
-
-- **Problema:** ARP Ping, ICMP Ping, SYN Scan y ACK Scan requieren construcción de paquetes en
-  crudo (*raw sockets*), lo que exige privilegios elevados y, en Windows, un driver de captura.
-- **Implicaciones por plataforma:** en Linux, ejecución como root o concesión de la capacidad
-  `CAP_NET_RAW` al intérprete; en Windows, instalación de **Npcap** y ejecución como
-  administrador. TCP Connect Scan es la única técnica de escaneo que no requiere privilegios.
-- **Criterios:** portabilidad real frente a complejidad de instalación, reproducibilidad del
-  banco de pruebas, degradación elegante cuando no hay privilegios disponibles.
-- **Estado:** sin decidir. Opciones a evaluar: exigir privilegios siempre; detectar privilegios
-  en arranque y degradar automáticamente a las técnicas disponibles (p. ej. TCP Connect en
-  lugar de SYN Scan) advirtiendo al usuario. Debe documentarse en la memoria como limitación
-  de despliegue en cualquier caso.
+**Se opta por `ThreadPoolExecutor` de forma uniforme**, con un límite de trabajadores configurable.
+Conviene añadir que el principal factor de rendimiento en la fase de descubrimiento no reside en la
+concurrencia del intérprete sino en las primitivas de envío por lotes de Scapy, capaces de resolver
+una barrida completa de subred en una sola invocación. Se acepta un rendimiento inferior al de una
+implementación asíncrona pura en escenarios de concurrencia muy elevada, situación que queda fuera
+del alcance definido en la decisión 003. Esta decisión revisa el supuesto de asincronía enunciado
+en la 001.
 
 ---
 
-## 010 — [PENDIENTE] Topología del laboratorio de pruebas
+## 007 — Correlación con vulnerabilidades conocidas
 
-- **Problema:** el enunciado circunscribe la herramienta a red de área local, y el requisito de
-  descubrimiento por ARP Ping exige que los objetivos estén en el **mismo segmento de capa 2**
-  que la máquina atacante. La topología del laboratorio condiciona por tanto qué requisitos
-  pueden demostrarse en el capítulo 6.
-- **Alternativas:** contenedores Docker con red `bridge` por defecto; Docker con red `macvlan`;
-  máquinas virtuales (VirtualBox/VMware) con adaptador en modo *bridged* o red interna;
-  combinación de VMs con imágenes vulnerables conocidas (Metasploitable, VulnHub).
-- **Restricción técnica identificada:** la red `bridge` por defecto de Docker no reproduce
-  fielmente un segmento L2 plano equivalente al de una LAN real, lo que compromete la validez
-  de las pruebas de ARP Ping. `macvlan` o VMs en modo *bridged* sí lo hacen.
-- **Criterios:** fidelidad respecto a una LAN real (imprescindible para ARP), reproducibilidad
-  y facilidad de despliegue mediante scripts, coste en recursos de la máquina anfitriona,
-  disponibilidad de objetivos heterogéneos Windows y Linux (necesarios para el requisito de
-  detección de sistema operativo).
-- **Estado:** sin decidir. Es la decisión con mayor impacto sobre el calendario: una elección
-  errónea invalida pruebas ya ejecutadas. Debe cerrarse antes de escribir los scripts de
-  despliegue del laboratorio.
+Se estudió la posibilidad de que la herramienta relacionase automáticamente las versiones de
+software identificadas mediante fingerprinting con vulnerabilidades públicamente documentadas,
+resolviendo esa correlación durante el propio escaneo.
+
+Las vías examinadas fueron la consulta en vivo a la API de NVD, la réplica local de sus ficheros de
+distribución y el despliegue propio de una instancia de `cve-search`. Ninguna resultó satisfactoria
+para los fines de este trabajo. La consulta en vivo introduce una dependencia externa sujeta a
+límites de tasa que compromete la reproducibilidad del banco de pruebas. La réplica local resuelve
+ese problema, pero deja intacto el verdaderamente difícil: la correspondencia entre las cadenas de
+versión que devuelve un banner, con sus formatos heterogéneos y frecuentemente incompletos, y los
+identificadores CPE normalizados que emplean las bases de datos de vulnerabilidades. Esa
+normalización constituye por sí sola un problema de investigación, y abordarla a medias produciría
+correlaciones poco fiables que restarían solidez al conjunto.
+
+**La funcionalidad queda fuera del alcance comprometido.** Se documenta como línea futura en las
+conclusiones y el paquete `correlation` permanece reservado en la estructura del proyecto. Se
+asume que el trabajo renuncia con ello a una aportación de mayor originalidad, a cambio de que la
+validación experimental descanse sobre resultados que pueden verificarse íntegramente contra el
+laboratorio.
 
 ---
 
-## Consideraciones éticas y legales (transversal)
+## 008 — Prioridad de implementación
 
-Todas las pruebas se ejecutan exclusivamente contra infraestructura propia o expresamente
-autorizada, en laboratorio aislado. No se dirige tráfico contra sistemas de terceros en ningún
-momento del desarrollo ni de la validación. Marco normativo aplicable: artículos 197 bis y 264
-del Código Penal español y, en lo que resulte de aplicación, el Reglamento General de
-Protección de Datos. Este apartado se desarrolla como sección propia en la memoria.
+El enunciado establece seis capacidades que la herramienta debe reunir: descubrimiento de equipos
+mediante ARP, TCP, UDP e ICMP Ping; enumeración de puertos abiertos mediante SYN Scan y TCP
+Connect; detección de filtrado mediante ACK Scan; obtención de versiones por banner grabbing;
+obtención de versiones por evaluación de cabeceras HTTP; y diferenciación entre sistemas Windows y
+Linux.
+
+Existe una razón técnica, y no solo de organización del trabajo, para tratarlas como base sobre la
+que construir cualquier otra cosa: toda funcionalidad adicional que quepa imaginar en una
+herramienta de este tipo se apoya en la salida del fingerprinting. Edificar sobre un módulo aún no
+validado significaría arrastrar sus errores hacia arriba y no poder discernir después si un
+resultado incorrecto procede de la capa nueva o del cimiento.
+
+**Los seis requisitos se implementan y se validan contra el laboratorio antes de abordar cualquier
+funcionalidad adicional.** Se acepta que el resultado será una herramienta de alcance deliberadamente
+acotado, y se prioriza la completitud verificable sobre la ambición funcional.
+
+---
+
+## 009 — Privilegios de ejecución
+
+Cuatro de las técnicas previstas —ARP Ping, ICMP Ping, SYN Scan y ACK Scan— construyen paquetes en
+crudo y requieren por ello privilegios elevados. TCP Connect Scan es la única que puede operar sin
+ellos, al apoyarse en la pila del sistema operativo.
+
+Cabían dos comportamientos. El primero, detectar los privilegios disponibles al arrancar y degradar
+automáticamente a las técnicas ejecutables, advirtiendo al usuario. El segundo, exigirlos siempre y
+abortar si no se dispone de ellos. La degradación automática resulta más cómoda, pero introduce un
+riesgo que en un contexto de medición no es menor: el usuario podría creer que está ejecutando un
+SYN Scan cuando en realidad se le ha sustituido por un TCP Connect, con un perfil de detección y un
+comportamiento frente a cortafuegos distintos. Trasladado al banco de pruebas, eso comprometería la
+comparabilidad de los resultados.
+
+**La herramienta exige privilegios elevados en todos los casos**, los comprueba al arrancar y, de no
+tenerlos, aborta con un mensaje explicativo. Se acepta que la exigencia es más restrictiva de lo
+estrictamente necesario, dado que una de las técnicas podría prescindir de ella, a cambio de un
+comportamiento uniforme y de la certeza de que la técnica ejecutada es siempre la solicitada. La
+degradación selectiva queda recogida como línea futura.
+
+---
+
+## 010 — Topología del laboratorio de pruebas
+
+El entorno de pruebas debe permitir demostrar las seis capacidades exigidas, y dos de ellas imponen
+condiciones estructurales. El descubrimiento mediante ARP solo funciona si los objetivos residen en
+el mismo dominio de difusión que la máquina atacante, por operar en capa de enlace. La detección de
+filtrado, a su vez, carece de sentido si no existe un objetivo con reglas de cortafuegos conocidas
+y controladas por quien realiza la prueba.
+
+Se consideraron contenedores Docker, tanto con red puente como con `macvlan`, y máquinas virtuales,
+tanto en modo puente sobre la red doméstica como sobre un segmento virtual aislado. La red puente
+por defecto de Docker quedó descartada porque no reproduce un dominio de difusión equivalente al de
+una red física, lo que invalidaría las pruebas de ARP. El modo puente sobre la red doméstica se
+descartó por razones éticas y legales: implicaría dirigir tráfico de escaneo hacia equipos ajenos
+al laboratorio.
+
+**El laboratorio se compone de cuatro máquinas virtuales sobre VMware Workstation, conectadas a un
+segmento virtual dedicado en modo *host-only*, con el servidor DHCP desactivado y direccionamiento
+estático.** La máquina atacante dispone de un segundo adaptador en modo NAT, empleado únicamente
+para la instalación de dependencias y en ningún caso para el tráfico de escaneo.
+
+| Máquina | Dirección | Función |
+|---|---|---|
+| Kali Linux | 192.168.56.10 | Máquina atacante, ejecución de la herramienta |
+| Metasploitable 2 | 192.168.56.20 | Objetivo Linux con servicios y banners identificables |
+| Ubuntu Server mínima | 192.168.56.30 | Objetivo Linux con reglas de cortafuegos controladas |
+| Windows 10 | 192.168.56.40 | Objetivo Windows para la diferenciación de sistema operativo |
+
+El objetivo dotado de cortafuegos expone de forma deliberada los tres estados que la herramienta
+debe discriminar: un puerto con servicio en escucha, un puerto sin servicio ni regla asociada, y un
+puerto sometido a una regla de descarte silencioso. Metasploitable 2 cumple una función
+complementaria y no intercambiable: al tratarse de un sistema deliberadamente vulnerable y
+desactualizado, ofrece un catálogo de servicios con banners ricos e identificables que resulta
+idóneo para las pruebas de fingerprinting, mientras que añadirle reglas de filtrado enturbiaría ese
+escenario.
+
+El conjunto requiere aproximadamente nueve gigabytes de memoria con todas las máquinas en ejecución
+simultánea. De no disponerse, las pruebas pueden ejecutarse por tandas sin menoscabo de su validez,
+al ser el direccionamiento estático y por tanto estable entre sesiones.
+
+---
+
+## 011 — Máquina de ejecución de la herramienta
+
+Quedaba por decidir desde qué sistema se desarrolla y se ejecuta la herramienta: el anfitrión
+Windows o la máquina virtual Kali Linux.
+
+En Linux, el acceso a sockets en crudo es nativo y no exige más que privilegios elevados. En
+Windows depende del controlador Npcap y arrastra limitaciones conocidas, particularmente en el
+envío de tramas en capa de enlace, que es precisamente lo que necesita el ARP Ping. A ello se suma
+que Kali incorpora de serie el instrumental necesario para verificar el comportamiento de la
+herramienta —nmap como referencia, y tcpdump y Wireshark para inspeccionar el tráfico generado y
+depurar los paquetes construidos—, y que ejecutar desde una máquina Linux reproduce con mayor
+fidelidad el escenario real de un pentesting interno.
+
+**El desarrollo y la ejecución se realizan sobre la máquina virtual Kali Linux.** Se acepta que la
+herramienta queda validada únicamente sobre Linux: su ejecución en Windows es teóricamente posible
+con Npcap instalado, pero no se prueba ni se garantiza, y así se hace constar entre las
+limitaciones del trabajo.
+
+---
+
+## Consideraciones éticas y legales
+
+Todas las pruebas se ejecutan contra infraestructura propia, desplegada en un segmento virtual
+aislado y sin encaminamiento hacia ninguna red externa. En ningún momento del desarrollo ni de la
+validación se dirige tráfico contra sistemas de terceros.
+
+El marco normativo aplicable comprende los artículos 197 bis y 264 del Código Penal español,
+relativos respectivamente al acceso no autorizado a sistemas de información y a los daños
+informáticos, así como el Reglamento General de Protección de Datos en lo que resulte de
+aplicación. El aislamiento del laboratorio no responde únicamente a una exigencia metodológica de
+reproducibilidad, sino también a la necesidad de garantizar que ninguna de las técnicas
+implementadas alcance sistemas sobre los que no se ostenta autorización. Este apartado se desarrolla
+como sección propia en la memoria.
