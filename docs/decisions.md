@@ -287,6 +287,188 @@ con Npcap instalado, pero no se prueba ni se garantiza, y así se hace constar e
 limitaciones del trabajo.
 
 ---
+## 012 — Mecanismo de filtrado del escenario de pruebas
+
+El escenario de validación exige que la máquina Ubuntu Server presente simultáneamente los tres
+estados que la herramienta debe discriminar: un puerto abierto, uno cerrado y uno filtrado. El
+tercero requiere una regla de cortafuegos, y la máquina se encontraba ya en el segmento aislado,
+sin salida a internet y sin ninguna herramienta de filtrado instalada, pues el perfil *minimal* de
+Ubuntu Server no incluye ni `iptables` ni `nftables`.
+
+Se valoraron cuatro vías. La primera era emplear `nftables`, opción preferible sobre el papel: en
+Ubuntu moderno `iptables` no es sino una fachada sobre esa misma infraestructura, y el paquete
+`nftables` aporta persistencia nativa mediante `/etc/nftables.conf` y su propio servicio, lo que
+habría evitado instalar un paquete adicional para conservar las reglas. La segunda, `iptables`
+acompañado de `iptables-persistent`. La tercera, reaplicar las reglas manualmente al inicio de cada
+sesión de trabajo, sin persistencia alguna. La cuarta, emplear la imagen ISO de instalación como
+repositorio local de paquetes, lo que habría permitido resolver la carencia sin conectar la máquina
+a ninguna red.
+
+Los criterios aplicados fueron la persistencia de las reglas entre reinicios, la reproducibilidad
+del escenario por un tercero, y la disponibilidad de la herramienta sin acceso a la red. La tercera
+vía quedó descartada de inmediato por el primer criterio: una regla que hubiera de reaplicarse a
+mano introduce la posibilidad de que una medición se ejecute sobre un escenario incompleto sin que
+nadie lo advierta, lo que comprometería silenciosamente los resultados. La cuarta se descartó tras
+comprobar que la imagen *live server* de Ubuntu distribuye un sistema de ficheros `squashfs` y no
+un conjunto de paquetes utilizable mediante `apt-cdrom`. Y la primera, la preferible, quedó
+descartada al verificarse que `nft` tampoco estaba instalado en el sistema.
+
+**Se emplea `iptables` junto con `iptables-persistent`.** Conviene dejar constancia explícita de que
+la vía basada en `nftables` no se descartó por criterio técnico sino por indisponibilidad: de haber
+estado presente en la instalación, habría sido la elegida.
+
+La decisión obligó a una segunda conexión temporal de la máquina a NAT para instalar ambos
+paquetes, con su correspondiente reversión verificada. Dos elecciones de configuración
+complementarias se derivan de este mismo escenario y quedan aquí recogidas por su estrecha
+relación. La regla emplea `DROP` y no `REJECT`, porque el estado *filtrado* se infiere de la
+ausencia de respuesta y un `REJECT` devolvería un mensaje ICMP de inalcanzable, produciendo un
+estado distinto e invalidando el escenario para las pruebas de ACK Scan. Y la política por defecto
+de la cadena de entrada permanece en `ACCEPT`, ya que con política `DROP` los tres puertos
+responderían de forma idéntica y el escenario perdería por completo su capacidad de discriminar
+entre un puerto cerrado y uno filtrado.
+
+---
+
+## 013 — Modelo de señales para la detección de sistema operativo
+
+La diferenciación entre sistemas Windows y Linux es el sexto requisito del enunciado y, de los
+seis, el único cuya resolución no es determinista: no existe una respuesta del sistema objetivo que
+declare su naturaleza, sino un conjunto de indicios que deben combinarse. El diseño de ese conjunto
+ha sido el elemento del proyecto con mayor recorrido experimental, y ha requerido dos revisiones
+sucesivas motivadas por mediciones del propio laboratorio.
+
+### Modelo inicial y su falsación
+
+El planteamiento original contemplaba tres señales: el tiempo de vida de los paquetes de respuesta,
+que los sistemas Windows inicializan en 128 y los Linux en 64; el tamaño de la ventana TCP
+anunciada en el SYN/ACK; y la presencia de los puertos 139 y 445, asociados a SMB. Dos de las tres
+resultaron no ser válidas tal como estaban formuladas.
+
+La señal basada en SMB se retira por completo. La propia Metasploitable del laboratorio ejecuta
+Samba y expone los puertos 139 y 445 en TCP, además de los 137 y 138 en UDP, de modo que su firma
+de puertos resulta indistinguible de la de un sistema Windows. Un servicio SMB en escucha indica
+que el host habla ese protocolo, no que ejecute Windows. Su ausencia resulta, paradójicamente, más
+informativa que su presencia.
+
+La señal basada en el tamaño de ventana se degrada. La medición con `tcpdump` sobre el tráfico real
+demostró que ante el SYN mínimo que envía `nmap -sS` —que anuncia únicamente la opción `mss`— tanto
+Ubuntu Server como Windows 10 responden con un valor idéntico de 64240. La señal solo discrimina
+cuando la sonda anuncia un juego completo de opciones, caso en el que Ubuntu responde 65160 y
+Windows 65535.
+
+### Señales validadas experimentalmente
+
+La medición con `tcpdump` ante una misma sonda con opciones completas arrojó las siguientes
+diferencias entre los dos sistemas:
+
+| | Ubuntu Server | Windows 10 |
+|---|---|---|
+| Tiempo de vida | 64 | 128 |
+| Ventana en SYN/ACK | 65160 | 65535 |
+| Opciones TCP | `mss, sackOK, TS, nop, wscale` | `mss, nop, wscale, nop, nop, sackOK` |
+| Marcas de tiempo TCP | Sí | No |
+| Longitud del datagrama | 60 | 52 |
+
+De ahí resulta el modelo definitivo, con cinco señales utilizables y un peso asignado a cada una:
+
+| Señal | Peso | Fundamento |
+|---|---|---|
+| Tiempo de vida 128 frente a 64 | Alto | Medido sobre el cable; alterable, pero infrecuente en la práctica |
+| Ausencia de marcas de tiempo TCP | Alto | Señal binaria, no numérica; Windows no las habilita de serie |
+| Orden de las opciones TCP | Alto | Firma de pila al estilo *p0f*; Linux sitúa `sackOK` en segunda posición, Windows lo relega tras rellenos `nop` |
+| Puerto 135 en escucha | Medio | Asignador de extremos RPC de Microsoft; Samba no lo implementa, de modo que discrimina frente a Metasploitable |
+| Puertos en escucha a partir de 49152 | Medio | Rango efímero de Windows, frente al rango 32768–60999 de Linux |
+| Tamaño de ventana con sonda completa | Bajo | 65160 frente a 65535; inservible con sonda mínima |
+
+### Decisión
+
+**Se adopta el modelo de cinco señales anterior, con dos consecuencias de diseño que condicionan la
+implementación.**
+
+La primera es que la sonda de detección de sistema operativo **debe anunciar un juego completo de
+opciones TCP** —`mss`, `sackOK`, marcas de tiempo y escala de ventana—, y no una sonda mínima como
+la que emplea `nmap -sS`. Con una sonda pelada se pierden dos de las tres señales de pila, ya que
+ni el tamaño de ventana discrimina ni las opciones del SYN/ACK reflejan diferencias apreciables.
+No se trata, por tanto, de una preferencia de implementación sino de una condición necesaria para
+que el requisito sea resoluble.
+
+La segunda es que el resultado **se expresa como un nivel de confianza y no como una afirmación
+categórica**. Ninguna de las señales es concluyente por sí sola: el tiempo de vida puede alterarse,
+los puertos característicos dependen de los servicios en ejecución y la firma de opciones puede
+variar entre versiones de una misma pila. Combinar cinco indicios ponderados y declarar el grado de
+certeza resultante es más honesto y más defendible que emitir un veredicto binario.
+
+### Consecuencias asumidas
+
+El modelo no ofrece garantía absoluta, y así debe reflejarse en las conclusiones. A cambio, el
+recorrido seguido constituye material de primer orden para el capítulo de casos de prueba: dos
+señales descartadas con evidencia obtenida del propio laboratorio y tres sustitutas validadas
+mediante medición directa sobre el cable. Metasploitable 2 se incorpora al banco de pruebas como
+**caso adverso deliberado**: un sistema Linux con SMB en escucha que la herramienta debe clasificar
+correctamente pese a presentar una firma de puertos característica de Windows.
+
+---
+
+## 014 — Criterio de acierto en la comparación con la herramienta de referencia
+
+La hipótesis del trabajo afirma que la herramienta alcanza una precisión equivalente a la de nmap.
+Contrastarla exige definir con precisión qué se cuenta como acierto, y la captura de datos de
+referencia reveló que la cuestión dista de ser trivial por dos motivos concretos.
+
+El primero es que nmap **no siempre devuelve versiones exactas**, sino rangos. Sobre el laboratorio
+identifica el servicio SMB de Metasploitable como `Samba 3.X - 4.X` y su gestor de bases de datos
+como `PostgreSQL 8.3.0 - 8.3.7`. El segundo es que **normaliza el formato de los banners**: la
+cadena que efectivamente viaja por la red, `SSH-2.0-OpenSSH_10.2p1 Ubuntu-2ubuntu3`, aparece en su
+salida como `OpenSSH 10.2p1 Ubuntu 2ubuntu3`, con los guiones bajos y los guiones sustituidos por
+espacios.
+
+Comparar cadenas literales entre ambas salidas produciría por tanto **falsos negativos derivados
+únicamente de diferencias de formato**, que nada dicen sobre la capacidad real de la herramienta.
+
+### Decisión
+
+**La referencia primaria de la medición es la verdad-terreno del laboratorio, no la salida de
+nmap.** Esta precisión es determinante: nmap es una herramienta de comparación, no un oráculo. Su
+salida se contrasta contra la misma referencia que la de Melmapo, lo que permite que ambas
+herramientas acierten, fallen o difieran, y que esas diferencias se interpreten sin presuponer cuál
+de las dos tiene razón.
+
+Sobre esa base se establecen tres criterios según la naturaleza del dato evaluado.
+
+**Estados de puerto.** La comparación es exacta y binaria. El estado declarado —abierto, cerrado o
+filtrado— coincide o no coincide con el estado real conocido. No caben coincidencias parciales.
+
+**Sistema operativo.** Se considera acierto que la familia declarada, Windows o Linux, coincida con
+la real. El nivel de confianza asociado se registra pero no penaliza el cómputo de aciertos: se
+analiza por separado, como indicador de la calibración del modelo.
+
+**Servicio y versión.** Se aplica una clasificación en tres niveles, previa normalización de ambas
+cadenas mediante conversión a minúsculas, sustitución de guiones bajos y guiones por espacios, y
+colapso de espacios consecutivos.
+
+- **Acierto exacto:** el producto coincide y la versión coincide con la real tras la normalización.
+- **Coincidencia parcial:** el producto coincide pero la versión no se determina con exactitud.
+  Se incluyen aquí los casos en que la versión real queda comprendida dentro de un rango declarado,
+  y aquellos en que se identifica el producto sin versión alguna.
+- **Fallo:** el producto declarado difiere del real, o la versión declarada es incompatible con
+  este.
+
+### Consecuencias asumidas
+
+La clasificación en tres niveles obliga a presentar los resultados con mayor detalle que una simple
+tasa de acierto, pero es la única forma de que la comparación resulte informativa. Merece la pena
+señalar una consecuencia que el planteamiento inicial no permitía apreciar: al medir ambas
+herramientas contra la misma verdad-terreno, es posible que Melmapo obtenga un **acierto exacto**
+allí donde nmap solo alcanza una **coincidencia parcial**, como ocurre en los servicios para los
+que la referencia devuelve rangos. La hipótesis se formuló en términos de equivalencia, de modo que
+un resultado superior en algún indicador concreto no la refuta; simplemente la supera, y así debe
+discutirse.
+
+Los criterios aquí fijados deben aplicarse de forma idéntica a ambas herramientas y declararse
+explícitamente en el capítulo de casos de prueba, de manera que un tercero pueda reproducir el
+cómputo a partir de las salidas en crudo.
+
+---
 
 ## Consideraciones éticas y legales
 
