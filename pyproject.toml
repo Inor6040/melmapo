@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "melmapo"
-version = "0.0.1"
-description = "Enumeracion y escaneo en LAN con correlacion fingerprint-CVE en tiempo de escaneo (TFM)"
+version = "0.1.0"
+description = "Herramienta de enumeracion y escaneo para la fase de reconocimiento en pentesting interno (TFM)"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "GPL-3.0-only" }
@@ -13,7 +13,7 @@ authors = [
     { name = "TODO: nombre del autor" }
 ]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Information Technology",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3.11",
@@ -27,6 +27,15 @@ dev = [
     "ruff>=0.6",
 ]
 
+[project.scripts]
+melmapo = "melmapo.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["melmapo"]
+
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
