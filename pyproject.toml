@@ -19,7 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Topic :: Security",
 ]
-dependencies = []
+dependencies = ["scapy>=2.7.0"]
 
 [project.optional-dependencies]
 dev = [
