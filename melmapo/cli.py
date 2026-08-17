@@ -19,6 +19,8 @@ from .core import (
     parsear_puertos,
 )
 from .core.privilegios import exigir_privilegios_o_salir
+from .output import guardar_json, tabla_consola
+from .scanning import escanear_connect
 
 DESCRIPCION = """\
 Melmapo. Enumeración y escaneo para la fase de reconocimiento inicial de un
@@ -131,20 +133,38 @@ def main(argv: list[str] | None = None) -> int:
         file=sys.stderr,
     )
 
+    escaneo = _seleccionar_escaneo(config.tecnica_escaneo)
+    if escaneo is None:
+        print(
+            f"error: la técnica {config.tecnica_escaneo.value!r} todavía no está "
+            f"implementada. Disponible: connect",
+            file=sys.stderr,
+        )
+        return 2
+
     try:
-        Orquestador(config).ejecutar()
+        resultado = Orquestador(config, escaneo=escaneo).ejecutar()
     except KeyboardInterrupt:
         print("\ninterrumpido por el operador", file=sys.stderr)
         return 130
 
-    # Las fases se incorporan en las jornadas siguientes; el orquestador ya las
-    # admite por inyección.
-    print(
-        "El núcleo está operativo. Las fases de descubrimiento, escaneo y "
-        "fingerprinting se incorporan en los módulos correspondientes.",
-        file=sys.stderr,
-    )
+    print(tabla_consola(resultado))
+
+    if args.salida:
+        destino = guardar_json(resultado, args.salida)
+        print(f"Resultados guardados en {destino}", file=sys.stderr)
+
     return 0
+
+
+def _seleccionar_escaneo(tecnica: TecnicaEscaneo):
+    """Devuelve la implementación correspondiente a la técnica solicitada.
+
+    Las técnicas basadas en paquetes en crudo se incorporan en su jornada; hasta
+    entonces se informa explícitamente en lugar de sustituirlas en silencio, que
+    es lo que la decisión 009 pretende evitar.
+    """
+    return {TecnicaEscaneo.CONNECT: escanear_connect}.get(tecnica)
 
 
 if __name__ == "__main__":

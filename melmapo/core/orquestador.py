@@ -13,6 +13,7 @@ un único modelo basado en `ThreadPoolExecutor` para todas las técnicas.
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -48,12 +49,31 @@ class Configuracion:
     interfaz: str | None = None
     omitir_descubrimiento: bool = False
     con_fingerprint: bool = True
+    _limitador: threading.Semaphore | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if self.trabajadores < 1:
             raise ValueError("el número de trabajadores debe ser al menos 1")
         if self.espera_s <= 0:
             raise ValueError("el tiempo de espera debe ser positivo")
+        if self._limitador is None:
+            self._limitador = threading.Semaphore(self.trabajadores)
+
+    @property
+    def limitador(self) -> threading.Semaphore:
+        """Semáforo que acota el número total de operaciones de red simultáneas.
+
+        La paralelización se produce en dos niveles: el orquestador reparte los
+        hosts entre hilos y cada fase reparte a su vez los puertos de un mismo
+        host. Sin una cota común, ambos niveles se multiplicarían y una
+        configuración de cincuenta trabajadores abriría dos mil quinientos
+        sockets a la vez, agotando descriptores y falseando las mediciones de
+        tiempo por saturación de la pila. El semáforo se adquiere únicamente
+        alrededor de la operación de red, nunca mientras un hilo espera a otro,
+        de modo que no puede producirse un interbloqueo entre ambos niveles.
+        """
+        assert self._limitador is not None  # garantizado por __post_init__
+        return self._limitador
 
     def a_parametros(self) -> dict[str, object]:
         """Parámetros de la ejecución, para dejar constancia en el resultado."""
