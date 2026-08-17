@@ -483,3 +483,105 @@ aplicación. El aislamiento del laboratorio no responde únicamente a una exigen
 reproducibilidad, sino también a la necesidad de garantizar que ninguna de las técnicas
 implementadas alcance sistemas sobre los que no se ostenta autorización. Este apartado se desarrolla
 como sección propia en la memoria.
+
+## 015 — Quinto estado de puerto
+ 
+El diseño inicial contemplaba cuatro estados de puerto: abierto, cerrado, filtrado
+y no filtrado. Los tres primeros son los que el enunciado exige discriminar; el
+cuarto lo requiere el ACK Scan, que no determina si un puerto está abierto sino si
+un cortafuegos con estado se interpone en el camino.
+ 
+Al abordar el escaneo y el descubrimiento sobre UDP se advirtió que ese conjunto
+resulta insuficiente. UDP carece de saludo, de modo que un datagrama dirigido a un
+puerto abierto no genera necesariamente respuesta alguna: el servicio puede
+limitarse a procesarlo en silencio. La ausencia de respuesta es por tanto
+compatible con dos situaciones que la herramienta no puede distinguir con la
+información de que dispone, a saber, que el puerto esté abierto y su servicio no
+conteste, o que un cortafuegos descarte el tráfico.
+ 
+Se valoraron tres salidas. La primera, clasificar como filtrado todo lo que no
+responda, que produciría falsos negativos sistemáticos sobre servicios UDP
+silenciosos. La segunda, clasificarlo como abierto, que produciría el error
+simétrico y, siendo el más frecuente en la práctica el filtrado, en mayor número.
+La tercera, declarar la ambigüedad como tal.
+ 
+**Se incorpora un quinto estado, `ABIERTO_FILTRADO`.** La solución coincide con la
+que adopta nmap, lo que además facilita la comparación de resultados entre ambas
+herramientas.
+ 
+La consecuencia asumida es que la salida resulta menos rotunda: en lugar de un
+veredicto para cada puerto, algunos quedan expresamente sin resolver. Se considera
+preferible a fabricar una certeza que la técnica no sostiene, y guarda coherencia
+con el tratamiento que la decisión 013 da al resultado de la detección de sistema
+operativo, expresado como nivel de confianza y no como afirmación categórica. El
+riesgo relativo a la ambigüedad del descubrimiento por UDP queda con ello atendido
+en el plano del modelo de datos, si bien su comportamiento real debe comprobarse
+en las pruebas correspondientes.
+ 
+---
+ 
+## 016 — Limitador de concurrencia
+ 
+La decisión 006b fijó `ThreadPoolExecutor` como modelo único de concurrencia. Al
+implementar el escaneo se advirtió que esa decisión, por sí sola, no basta.
+ 
+La paralelización se produce en dos niveles. El orquestador reparte los objetivos
+entre hilos, y cada fase reparte a su vez los puertos de un mismo objetivo. Ambos
+niveles leen el mismo parámetro de configuración, de modo que una ejecución con
+cincuenta trabajadores abriría cincuenta hilos de objetivos, cada uno con
+cincuenta hilos de puertos: dos mil quinientas operaciones de red simultáneas. El
+efecto no es solo el agotamiento de descriptores de fichero del proceso. Es, sobre
+todo, que la saturación de la pila de red introduce demoras que se atribuirían
+erróneamente a los objetivos, falseando las mediciones de latencia sobre las que
+se apoya la comparación de tiempos.
+ 
+Se consideraron tres alternativas. Repartir el parámetro entre ambos niveles
+—asignando la raíz cuadrada a cada uno, por ejemplo— resulta poco predecible y
+difícil de explicar. Eliminar la paralelización de uno de los niveles simplifica
+el problema pero desaprovecha el paralelismo en el escenario contrario al elegido:
+suprimirla en los puertos penaliza el escaneo de un único objetivo, y suprimirla
+en los objetivos penaliza el barrido de un segmento. La tercera consiste en
+mantener ambos niveles y acotar el total.
+ 
+**Se incorpora un semáforo compartido que acota el número total de operaciones de
+red en vuelo**, con independencia del nivel desde el que se inicien. El límite
+coincide con el número de trabajadores configurado, de modo que el parámetro
+recupera el significado que el operador le atribuye: el máximo de operaciones
+simultáneas.
+ 
+Una precisión sobre su uso, necesaria para justificar que el diseño es seguro: el
+semáforo se adquiere únicamente alrededor de la operación de red y se libera en
+todos los casos, incluidos los de error, mediante una cláusula de finalización.
+Nunca se mantiene adquirido mientras un hilo espera el resultado de otro. Esa
+condición es la que impide el interbloqueo que un semáforo compartido entre dos
+niveles de paralelismo podría producir en caso contrario.
+ 
+Esta decisión amplía la 006b, no la sustituye.
+ 
+---
+ 
+## 017 — Combinación de las técnicas de descubrimiento
+ 
+Al integrar las técnicas de descubrimiento hubo que decidir si detener el sondeo
+de un objetivo en cuanto una de ellas confirma que está activo, o ejecutarlas
+todas y registrar cuáles responden.
+ 
+La primera opción es más rápida: en un segmento donde la mayoría de los equipos
+responde al eco ICMP, el resto de técnicas no llegaría a ejecutarse. La segunda
+cuesta más tiempo, pero produce un dato que la primera destruye, a saber, qué
+técnicas responden en qué equipos.
+ 
+Ese dato no es accesorio. El enunciado exige implementar cuatro técnicas de
+descubrimiento, y la justificación de por qué hacen falta cuatro y no una descansa
+precisamente en que cada una acierta donde las demás fallan. Con la primera opción
+esa afirmación solo podría sostenerse por remisión a la literatura; con la segunda,
+se sostiene con medidas del propio laboratorio.
+ 
+**Se ejecutan todas las técnicas solicitadas sobre cada objetivo y se registra la
+lista de las que obtuvieron respuesta.** El operador conserva el control del coste
+mediante la selección de técnicas, de modo que quien busque rapidez puede solicitar
+una sola.
+ 
+Se asume el mayor coste temporal, acotado en cualquier caso por el número de
+técnicas seleccionadas, que no supera cuatro. El registro de las técnicas
+respondidas se incorpora al modelo de datos y a ambas salidas.

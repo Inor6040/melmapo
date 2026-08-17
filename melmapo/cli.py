@@ -19,6 +19,7 @@ from .core import (
     parsear_puertos,
 )
 from .core.privilegios import exigir_privilegios_o_salir
+from .discovery import descubrir
 from .output import guardar_json, tabla_consola
 from .scanning import escanear_connect
 
@@ -54,12 +55,17 @@ def construir_analizador() -> argparse.ArgumentParser:
                    default=Protocolo.TCP.value, help="protocolo de transporte")
     a.add_argument("--tecnica", choices=[t.value for t in TecnicaEscaneo],
                    default=TecnicaEscaneo.SYN.value, help="técnica de escaneo de puertos")
-    a.add_argument("--descubrimiento", default="arp",
-                   help="técnicas de descubrimiento separadas por comas: arp, icmp, tcp, udp")
+    a.add_argument("--descubrimiento", default="icmp",
+                   help="técnicas de descubrimiento separadas por comas: icmp, tcp, udp "
+                        "(arp se incorpora en la jornada siguiente)")
     a.add_argument("-Pn", "--sin-descubrimiento", action="store_true",
                    help="omitir el descubrimiento y tratar todos los objetivos como activos")
     a.add_argument("--sin-fingerprint", action="store_true",
                    help="omitir la identificación de servicios y de sistema operativo")
+    a.add_argument("--puerto-ping-tcp", type=int, default=80,
+                   help="puerto de destino del TCP Ping (por defecto, 80)")
+    a.add_argument("--puerto-ping-udp", type=int, default=40125,
+                   help="puerto de destino del UDP Ping (por defecto, 40125)")
     a.add_argument("-i", "--interfaz", default=None, help="interfaz de red a emplear")
     a.add_argument("-t", "--trabajadores", type=int, default=50,
                    help="número máximo de hilos simultáneos (por defecto, 50)")
@@ -109,6 +115,8 @@ def construir_configuracion(args: argparse.Namespace) -> Configuracion:
         interfaz=args.interfaz,
         omitir_descubrimiento=args.sin_descubrimiento,
         con_fingerprint=not args.sin_fingerprint,
+        puerto_ping_tcp=args.puerto_ping_tcp,
+        puerto_ping_udp=args.puerto_ping_udp,
     )
 
 
@@ -143,7 +151,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     try:
-        resultado = Orquestador(config, escaneo=escaneo).ejecutar()
+        resultado = Orquestador(
+            config,
+            descubrimiento=None if config.omitir_descubrimiento else descubrir,
+            escaneo=escaneo,
+        ).ejecutar()
     except KeyboardInterrupt:
         print("\ninterrumpido por el operador", file=sys.stderr)
         return 130

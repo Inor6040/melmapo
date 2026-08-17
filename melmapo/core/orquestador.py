@@ -49,6 +49,8 @@ class Configuracion:
     interfaz: str | None = None
     omitir_descubrimiento: bool = False
     con_fingerprint: bool = True
+    puerto_ping_tcp: int = 80
+    puerto_ping_udp: int = 40125
     _limitador: threading.Semaphore | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -76,17 +78,34 @@ class Configuracion:
         return self._limitador
 
     def a_parametros(self) -> dict[str, object]:
-        """Parámetros de la ejecución, para dejar constancia en el resultado."""
-        return {
+        """Parámetros de la ejecución, para dejar constancia en el resultado.
+
+        Se registra lo que efectivamente se ejecuta y no lo que se configuró. La
+        distinción importa cuando se omite el descubrimiento: declarar las
+        técnicas seleccionadas cuando la fase no llegó a ejecutarse induciría a
+        error a quien leyera después el fichero en crudo del anexo, y el
+        apartado dedicado a la metodología de medición promete que las salidas
+        permiten reproducir el cómputo.
+        """
+        ejecutadas = (
+            [] if self.omitir_descubrimiento
+            else [t.value for t in self.tecnicas_descubrimiento]
+        )
+        parametros: dict[str, object] = {
             "objetivos": len(self.objetivos),
             "puertos": len(self.puertos),
             "protocolo": self.protocolo.value,
-            "tecnicas_descubrimiento": [t.value for t in self.tecnicas_descubrimiento],
+            "tecnicas_descubrimiento": ejecutadas,
             "tecnica_escaneo": self.tecnica_escaneo.value,
             "trabajadores": self.trabajadores,
             "espera_s": self.espera_s,
             "omitir_descubrimiento": self.omitir_descubrimiento,
         }
+        if TecnicaDescubrimiento.TCP.value in ejecutadas:
+            parametros["puerto_ping_tcp"] = self.puerto_ping_tcp
+        if TecnicaDescubrimiento.UDP.value in ejecutadas:
+            parametros["puerto_ping_udp"] = self.puerto_ping_udp
+        return parametros
 
 
 class FaseDescubrimiento(Protocol):

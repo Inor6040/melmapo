@@ -49,6 +49,12 @@ def _bloque_host(host: Host) -> list[str]:
         cabecera += f", {host.fabricante})" if host.fabricante else ")"
     lineas.append(cabecera)
 
+    if host.tecnicas_respondidas:
+        detalle = ", ".join(t.value for t in host.tecnicas_respondidas)
+        if host.ttl_observado is not None:
+            detalle += f" | tiempo de vida {host.ttl_observado}"
+        lineas.append(f"  Responde a: {detalle}")
+
     if host.so is not None and host.so.confianza > 0:
         lineas.append(
             f"  Sistema operativo: {host.so.familia.value} "

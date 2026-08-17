@@ -6,7 +6,11 @@ import pytest
 
 from melmapo.core.modelo import EstadoPuerto, Host, Puerto, TecnicaEscaneo
 from melmapo.core.orquestador import Configuracion, Orquestador, en_paralelo
-from melmapo.core.privilegios import SinPrivilegios, exigir_privilegios, tiene_privilegios
+from melmapo.core.privilegios import (
+    SinPrivilegios,
+    exigir_privilegios,
+    tiene_privilegios,
+)
 
 
 def _config(**kwargs) -> Configuracion:
