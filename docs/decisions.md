@@ -470,20 +470,6 @@ cómputo a partir de las salidas en crudo.
 
 ---
 
-## Consideraciones éticas y legales
-
-Todas las pruebas se ejecutan contra infraestructura propia, desplegada en un segmento virtual
-aislado y sin encaminamiento hacia ninguna red externa. En ningún momento del desarrollo ni de la
-validación se dirige tráfico contra sistemas de terceros.
-
-El marco normativo aplicable comprende los artículos 197 bis y 264 del Código Penal español,
-relativos respectivamente al acceso no autorizado a sistemas de información y a los daños
-informáticos, así como el Reglamento General de Protección de Datos en lo que resulte de
-aplicación. El aislamiento del laboratorio no responde únicamente a una exigencia metodológica de
-reproducibilidad, sino también a la necesidad de garantizar que ninguna de las técnicas
-implementadas alcance sistemas sobre los que no se ostenta autorización. Este apartado se desarrolla
-como sección propia en la memoria.
-
 ## 015 — Quinto estado de puerto
  
 El diseño inicial contemplaba cuatro estados de puerto: abierto, cerrado, filtrado
@@ -585,3 +571,19 @@ una sola.
 Se asume el mayor coste temporal, acotado en cualquier caso por el número de
 técnicas seleccionadas, que no supera cuatro. El registro de las técnicas
 respondidas se incorpora al modelo de datos y a ambas salidas.
+
+---
+
+## Consideraciones éticas y legales
+
+Todas las pruebas se ejecutan contra infraestructura propia, desplegada en un segmento virtual
+aislado y sin encaminamiento hacia ninguna red externa. En ningún momento del desarrollo ni de la
+validación se dirige tráfico contra sistemas de terceros.
+
+El marco normativo aplicable comprende los artículos 197 bis y 264 del Código Penal español,
+relativos respectivamente al acceso no autorizado a sistemas de información y a los daños
+informáticos, así como el Reglamento General de Protección de Datos en lo que resulte de
+aplicación. El aislamiento del laboratorio no responde únicamente a una exigencia metodológica de
+reproducibilidad, sino también a la necesidad de garantizar que ninguna de las técnicas
+implementadas alcance sistemas sobre los que no se ostenta autorización. Este apartado se desarrolla
+como sección propia en la memoria.
