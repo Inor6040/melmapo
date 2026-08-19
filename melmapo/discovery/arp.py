@@ -38,6 +38,35 @@ DIFUSION = "ff:ff:ff:ff:ff:ff"
 LOTE = 256
 
 
+def _resolver_interfaz(scapy, direccion: IPv4Address, interfaz: str | None) -> str | None:
+    """Determina por qué interfaz debe salir la difusión ARP.
+
+    Es una precisión necesaria y no un detalle de comodidad. A diferencia del
+    tráfico IP, que la pila encamina por sí sola, una difusión en capa de enlace
+    se emite por una interfaz concreta y no alcanza más segmento que el suyo. En
+    un equipo con varios adaptadores —el caso de la máquina atacante, que dispone
+    de uno para el laboratorio y otro para instalar dependencias— emitirla por el
+    adaptador equivocado produce un barrido sin respuestas que resulta
+    indistinguible de un segmento vacío.
+
+    La interfaz se deduce consultando la tabla de encaminamiento para la
+    dirección de destino, que es la misma decisión que tomaría el sistema al
+    enviarle un paquete. Si el operador la indica expresamente, su elección
+    prevalece.
+    """
+    if interfaz is not None:
+        return interfaz
+
+    try:
+        elegida = scapy.conf.route.route(str(direccion))[0]
+    except (OSError, IndexError, AttributeError):  # pragma: no cover - depende del sistema
+        registro.debug("no se pudo determinar la interfaz para %s", direccion)
+        return None
+
+    registro.debug("interfaz para %s: %s", direccion, elegida)
+    return elegida
+
+
 def barrer(
     objetivos: Sequence[IPv4Address],
     espera_s: float = 2.0,
@@ -50,12 +79,28 @@ def barrer(
     ambigüedad del silencio que sí presenta el sondeo UDP, porque un equipo del
     segmento está obligado a contestar.
     """
+    if not objetivos:
+        return {}
+
     scapy = cargar()
+    # La interfaz se resuelve una sola vez: todos los objetivos de un barrido
+    # pertenecen al mismo segmento, que es la condición para que ARP los alcance.
+    elegida = _resolver_interfaz(scapy, objetivos[0], interfaz)
     encontrados: dict[IPv4Address, str] = {}
 
     for inicio in range(0, len(objetivos), LOTE):
         tanda = objetivos[inicio : inicio + LOTE]
-        encontrados.update(_barrer_tanda(scapy, tanda, espera_s, interfaz))
+        encontrados.update(_barrer_tanda(scapy, tanda, espera_s, elegida))
+
+    if not encontrados:
+        # En ARP el silencio absoluto es anómalo: cualquier equipo del segmento
+        # está obligado a responder. Lo más probable es que la difusión haya
+        # salido por una interfaz que no da a la red de los objetivos.
+        registro.warning(
+            "el barrido ARP por %s no obtuvo ninguna respuesta; "
+            "compruebe que es la interfaz del segmento de los objetivos",
+            elegida or "la interfaz predeterminada",
+        )
 
     return encontrados
 

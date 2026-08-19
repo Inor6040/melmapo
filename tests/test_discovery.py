@@ -328,17 +328,33 @@ class TestParametrosRegistrados:
 
 # --- ARP -------------------------------------------------------------------
 
+class _Ruta:
+    def __init__(self, interfaz="eth1"):
+        self._interfaz = interfaz
+
+    def route(self, destino):
+        return (self._interfaz, "192.168.56.10", "0.0.0.0")
+
+
+class _Conf:
+    def __init__(self, interfaz="eth1"):
+        self.route = _Ruta(interfaz)
+
+
 class _ScapyARP:
     """Doble de Scapy para el barrido ARP, que usa srp en lugar de sr1."""
 
-    def __init__(self, respuestas):
+    def __init__(self, respuestas, interfaz="eth1"):
         self._respuestas = respuestas
         self.peticiones = []
+        self.interfaces = []
+        self.conf = _Conf(interfaz)
         self.ARP = _constructor("ARP")
         self.Ether = _constructor("Ether")
 
     def srp(self, peticion, timeout=None, verbose=0, iface=None, retry=0):
         self.peticiones.append(peticion)
+        self.interfaces.append(iface)
         return self._respuestas, []
 
 
@@ -404,3 +420,33 @@ class TestARP:
         objetivos = [IPv4Address(f"10.0.{a}.{b}") for a in range(3) for b in range(256)]
         arp.barrer(objetivos, 1.0)
         assert len(falso.peticiones) == 3
+
+
+class TestResolucionDeInterfaz:
+    """La difusión ARP no se encamina: debe salir por la interfaz correcta."""
+
+    def _con(self, monkeypatch, interfaz_ruta="eth1"):
+        falso = _ScapyARP([], interfaz_ruta)
+        monkeypatch.setattr(arp, "cargar", lambda: falso)
+        return falso
+
+    def test_se_deduce_de_la_tabla_de_encaminamiento(self, monkeypatch):
+        falso = self._con(monkeypatch, "eth1")
+        arp.barrer([IPv4Address("192.168.56.20")], 1.0)
+        assert falso.interfaces == ["eth1"]
+
+    def test_la_indicada_por_el_operador_prevalece(self, monkeypatch):
+        falso = self._con(monkeypatch, "eth1")
+        arp.barrer([IPv4Address("192.168.56.20")], 1.0, interfaz="eth2")
+        assert falso.interfaces == ["eth2"]
+
+    def test_se_resuelve_una_sola_vez_por_barrido(self, monkeypatch):
+        falso = self._con(monkeypatch, "eth1")
+        objetivos = [IPv4Address(f"10.0.{a}.{b}") for a in range(2) for b in range(256)]
+        arp.barrer(objetivos, 1.0)
+        assert falso.interfaces == ["eth1", "eth1"]
+
+    def test_barrido_sin_objetivos(self, monkeypatch):
+        falso = self._con(monkeypatch)
+        assert arp.barrer([], 1.0) == {}
+        assert falso.peticiones == []
