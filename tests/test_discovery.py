@@ -10,7 +10,7 @@ from ipaddress import IPv4Address
 
 from melmapo.core.modelo import TecnicaDescubrimiento
 from melmapo.core.orquestador import Configuracion
-from melmapo.discovery import descubrir, icmp, tcp, udp
+from melmapo.discovery import arp, descubrir, icmp, tcp, udp
 from melmapo.discovery.udp import ResultadoUDP
 
 # --- dobles ---------------------------------------------------------------
@@ -242,8 +242,53 @@ class TestFaseDescubrimiento:
         hosts = descubrir(config.objetivos, config)
         assert [str(h.direccion) for h in hosts] == ["192.168.56.10", "192.168.56.40"]
 
-    def test_arp_no_implementada_se_omite_sin_fallar(self, monkeypatch):
+    def test_arp_marca_activo_y_registra_la_mac(self, monkeypatch):
+        monkeypatch.setattr(
+            arp, "barrer",
+            lambda objetivos, espera, interfaz=None: {
+                IPv4Address("192.168.56.20"): "00:0c:29:20:b5:39"
+            },
+        )
         config = self._config([TecnicaDescubrimiento.ARP])
+        hosts = descubrir(config.objetivos, config)
+
+        assert hosts[0].activo is True
+        assert hosts[0].mac == "00:0c:29:20:b5:39"
+        assert hosts[0].tecnicas_respondidas == [TecnicaDescubrimiento.ARP]
+        # El .30 no respondió al barrido.
+        assert hosts[1].activo is False
+
+    def test_arp_no_aporta_tiempo_de_vida(self, monkeypatch):
+        """ARP opera por debajo de la capa de red: no hay campo TTL."""
+        monkeypatch.setattr(
+            arp, "barrer",
+            lambda objetivos, espera, interfaz=None: {
+                IPv4Address("192.168.56.20"): "00:0c:29:20:b5:39"
+            },
+        )
+        config = self._config([TecnicaDescubrimiento.ARP])
+        hosts = descubrir(config.objetivos, config)
+        assert hosts[0].ttl_observado is None
+
+    def test_arp_se_combina_con_las_demas(self, monkeypatch):
+        monkeypatch.setattr(
+            arp, "barrer",
+            lambda objetivos, espera, interfaz=None: {
+                IPv4Address("192.168.56.20"): "00:0c:29:20:b5:39"
+            },
+        )
+        monkeypatch.setattr(icmp, "sondear", lambda d, e, l=None: (True, 64))
+        config = self._config([TecnicaDescubrimiento.ARP, TecnicaDescubrimiento.ICMP])
+        hosts = descubrir(config.objetivos, config)
+
+        assert hosts[0].tecnicas_respondidas == [
+            TecnicaDescubrimiento.ARP, TecnicaDescubrimiento.ICMP
+        ]
+        assert hosts[0].mac is not None
+        assert hosts[0].ttl_observado == 64
+
+    def test_sin_tecnicas_no_sondea_nada(self):
+        config = self._config([])
         hosts = descubrir(config.objetivos, config)
         assert not any(h.activo for h in hosts)
 
@@ -279,3 +324,83 @@ class TestParametrosRegistrados:
         p = config.a_parametros()
         assert p["puerto_ping_tcp"] == 80
         assert "puerto_ping_udp" not in p
+
+
+# --- ARP -------------------------------------------------------------------
+
+class _ScapyARP:
+    """Doble de Scapy para el barrido ARP, que usa srp en lugar de sr1."""
+
+    def __init__(self, respuestas):
+        self._respuestas = respuestas
+        self.peticiones = []
+        self.ARP = _constructor("ARP")
+        self.Ether = _constructor("Ether")
+
+    def srp(self, peticion, timeout=None, verbose=0, iface=None, retry=0):
+        self.peticiones.append(peticion)
+        return self._respuestas, []
+
+
+class _RespuestaARP:
+    def __init__(self, psrc, hwsrc, clase):
+        self._capa = _Capa(psrc=psrc, hwsrc=hwsrc)
+        self._clase = clase
+
+    def __getitem__(self, capa):
+        return self._capa
+
+
+class TestARP:
+    def _con(self, monkeypatch, pares):
+        clase = _constructor("ARP")
+        respuestas = [(None, _RespuestaARP(ip, mac, clase)) for ip, mac in pares]
+        falso = _ScapyARP(respuestas)
+        falso.ARP = clase
+        monkeypatch.setattr(arp, "cargar", lambda: falso)
+        return falso
+
+    def test_barrido_devuelve_las_macs(self, monkeypatch):
+        self._con(monkeypatch, [
+            ("192.168.56.20", "00:0C:29:20:B5:39"),
+            ("192.168.56.30", "00:0c:29:01:3f:68"),
+        ])
+        r = arp.barrer([IPv4Address("192.168.56.20"), IPv4Address("192.168.56.30")], 1.0)
+
+        assert len(r) == 2
+        assert r[IPv4Address("192.168.56.20")] == "00:0c:29:20:b5:39"
+
+    def test_normaliza_a_minusculas(self, monkeypatch):
+        """La comparación con la tabla de referencia exige un formato único."""
+        self._con(monkeypatch, [("192.168.56.20", "00:0C:29:20:B5:39")])
+        r = arp.barrer([IPv4Address("192.168.56.20")], 1.0)
+        assert r[IPv4Address("192.168.56.20")].islower()
+
+    def test_los_que_no_responden_no_aparecen(self, monkeypatch):
+        self._con(monkeypatch, [("192.168.56.20", "00:0c:29:20:b5:39")])
+        objetivos = [IPv4Address(f"192.168.56.{n}") for n in (20, 21, 22)]
+        r = arp.barrer(objetivos, 1.0)
+        assert list(r) == [IPv4Address("192.168.56.20")]
+
+    def test_barrido_vacio(self, monkeypatch):
+        self._con(monkeypatch, [])
+        assert arp.barrer([IPv4Address("192.168.56.99")], 1.0) == {}
+
+    def test_sondeo_individual(self, monkeypatch):
+        self._con(monkeypatch, [("192.168.56.20", "00:0c:29:20:b5:39")])
+        activo, mac = arp.sondear(IPv4Address("192.168.56.20"), 1.0)
+        assert activo is True
+        assert mac == "00:0c:29:20:b5:39"
+
+    def test_sondeo_individual_sin_respuesta(self, monkeypatch):
+        self._con(monkeypatch, [])
+        activo, mac = arp.sondear(IPv4Address("192.168.56.99"), 1.0)
+        assert activo is False
+        assert mac is None
+
+    def test_se_fracciona_en_lotes(self, monkeypatch):
+        """Un segmento amplio no debe construirse como un único paquete gigante."""
+        falso = self._con(monkeypatch, [])
+        objetivos = [IPv4Address(f"10.0.{a}.{b}") for a in range(3) for b in range(256)]
+        arp.barrer(objetivos, 1.0)
+        assert len(falso.peticiones) == 3

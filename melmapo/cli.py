@@ -55,9 +55,9 @@ def construir_analizador() -> argparse.ArgumentParser:
                    default=Protocolo.TCP.value, help="protocolo de transporte")
     a.add_argument("--tecnica", choices=[t.value for t in TecnicaEscaneo],
                    default=TecnicaEscaneo.SYN.value, help="técnica de escaneo de puertos")
-    a.add_argument("--descubrimiento", default="icmp",
-                   help="técnicas de descubrimiento separadas por comas: icmp, tcp, udp "
-                        "(arp se incorpora en la jornada siguiente)")
+    a.add_argument("--descubrimiento", default="arp",
+                   help="técnicas de descubrimiento separadas por comas: arp, icmp, tcp, udp "
+                        "(por defecto, arp: es la más fiable en red local)")
     a.add_argument("-Pn", "--sin-descubrimiento", action="store_true",
                    help="omitir el descubrimiento y tratar todos los objetivos como activos")
     a.add_argument("--sin-fingerprint", action="store_true",
