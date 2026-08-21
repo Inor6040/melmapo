@@ -21,6 +21,10 @@ ajustarse al patrón de un intento de conexión, mientras que uno con estado lo
 descarta al no pertenecer a ninguna conexión conocida. El resultado del escaneo
 permite distinguir cuál de los dos se encuentra interpuesto.
 
+Emplea el mismo envío por lotes que el SYN Scan, por el motivo allí expuesto y
+para que la comparación de tiempos entre ambas técnicas en el banco de pruebas no
+quede condicionada por una diferencia de implementación ajena a la técnica.
+
 Nota para el banco de pruebas: la inferencia descansa sobre la ausencia de
 respuesta, de modo que un cortafuegos configurado para rechazar el tráfico
 devolviendo un mensaje de destino inalcanzable produce una observación distinta
@@ -31,12 +35,13 @@ escenario para el que la técnica fue concebida.
 from __future__ import annotations
 
 import logging
+import random
 import time
 
 from ..core.modelo import EstadoPuerto, Host, Protocolo, Puerto, TecnicaEscaneo
-from ..core.orquestador import Configuracion, en_paralelo
+from ..core.orquestador import Configuracion
 from ..discovery._scapy import cargar
-from .syn import CODIGOS_FILTRADO, RST
+from .syn import CODIGOS_FILTRADO, LOTE, ORIGEN_MAX, ORIGEN_MIN, RST
 
 registro = logging.getLogger(__name__)
 
@@ -60,54 +65,69 @@ def _clasificar(scapy, respuesta) -> EstadoPuerto:
     return EstadoPuerto.FILTRADO
 
 
-def escanear_puerto(
-    direccion: str,
-    numero: int,
-    espera_s: float,
-    limitador=None,
-) -> Puerto:
-    """Determina si un puerto está filtrado mediante un segmento ACK aislado."""
-    puerto = Puerto(
-        numero=numero,
-        protocolo=Protocolo.TCP,
-        estado=EstadoPuerto.FILTRADO,
-        tecnica=TecnicaEscaneo.ACK,
-    )
-    scapy = cargar()
+def _escanear_tanda(scapy, direccion: str, numeros: list[int], espera_s: float) -> list[Puerto]:
+    """Despacha una tanda completa de segmentos ACK y recoge las respuestas."""
+    origen = random.randint(ORIGEN_MIN, ORIGEN_MAX)  # noqa: S311 - no es uso criptográfico
+    sondas = [
+        scapy.IP(dst=direccion) / scapy.TCP(sport=origen, dport=n, flags="A")
+        for n in numeros
+    ]
 
-    if limitador is not None:
-        limitador.acquire()
     inicio = time.perf_counter()
     try:
-        sonda = scapy.IP(dst=direccion) / scapy.TCP(dport=numero, flags="A")
-        respuesta = scapy.sr1(sonda, timeout=espera_s, verbose=0)
+        respondieron, _ = scapy.sr(sondas, timeout=espera_s, verbose=0, retry=0)
     except OSError as exc:  # pragma: no cover - depende de la red
-        registro.debug("ACK Scan hacia %s:%d: %s", direccion, numero, exc)
-        puerto.latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
-        return puerto
-    finally:
-        if limitador is not None:
-            limitador.release()
+        registro.warning("ACK Scan hacia %s fallido: %s", direccion, exc)
+        return [
+            Puerto(
+                numero=n,
+                protocolo=Protocolo.TCP,
+                estado=EstadoPuerto.FILTRADO,
+                tecnica=TecnicaEscaneo.ACK,
+            )
+            for n in numeros
+        ]
+    transcurrido = round((time.perf_counter() - inicio) * 1000, 2)
 
-    puerto.latencia_ms = round((time.perf_counter() - inicio) * 1000, 2)
+    estados: dict[int, EstadoPuerto] = {}
+    for enviado, recibido in respondieron:
+        estados[int(enviado[scapy.TCP].dport)] = _clasificar(scapy, recibido)
 
-    if respuesta is None:
-        # Descarte silencioso: es el resultado que evidencia filtrado con estado.
-        puerto.estado = EstadoPuerto.FILTRADO
-        return puerto
+    return [
+        Puerto(
+            numero=n,
+            protocolo=Protocolo.TCP,
+            # Descarte silencioso: es el resultado que evidencia filtrado con estado.
+            estado=estados.get(n, EstadoPuerto.FILTRADO),
+            tecnica=TecnicaEscaneo.ACK,
+            latencia_ms=transcurrido,
+        )
+        for n in numeros
+    ]
 
-    puerto.estado = _clasificar(scapy, respuesta)
-    return puerto
+
+def escanear_puertos(direccion: str, numeros: list[int], espera_s: float = 2.0) -> list[Puerto]:
+    """Determina si un conjunto de puertos está filtrado."""
+    if not numeros:
+        return []
+
+    scapy = cargar()
+    puertos: list[Puerto] = []
+    for inicio in range(0, len(numeros), LOTE):
+        tanda = list(numeros[inicio : inicio + LOTE])
+        puertos.extend(_escanear_tanda(scapy, direccion, tanda, espera_s))
+    return puertos
+
+
+def escanear_puerto(direccion: str, numero: int, espera_s: float = 2.0) -> Puerto:
+    """Sondea un único puerto. Se ofrece por simetría con las demás técnicas."""
+    return escanear_puertos(direccion, [numero], espera_s)[0]
 
 
 def escanear_host(host: Host, config: Configuracion) -> Host:
     """Aplica la detección de filtrado a todos los puertos configurados."""
     direccion = str(host.direccion)
-
-    def tarea(numero: int) -> Puerto:
-        return escanear_puerto(direccion, numero, config.espera_s, config.limitador)
-
-    puertos = en_paralelo(tarea, config.puertos, config.trabajadores)
+    puertos = escanear_puertos(direccion, list(config.puertos), config.espera_s)
 
     host.puertos.extend(sorted(puertos, key=lambda p: p.numero))
     no_filtrados = sum(1 for p in puertos if p.estado is EstadoPuerto.NO_FILTRADO)
