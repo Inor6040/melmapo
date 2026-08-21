@@ -21,7 +21,7 @@ from .core import (
 from .core.privilegios import exigir_privilegios_o_salir
 from .discovery import descubrir
 from .output import guardar_json, tabla_consola
-from .scanning import escanear_connect
+from .scanning import escanear_ack, escanear_connect, escanear_syn
 
 DESCRIPCION = """\
 Melmapo. Enumeración y escaneo para la fase de reconocimiento inicial de un
@@ -142,10 +142,10 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     escaneo = _seleccionar_escaneo(config.tecnica_escaneo)
-    if escaneo is None:
+    if escaneo is None:  # pragma: no cover - defensa ante técnicas futuras
         print(
             f"error: la técnica {config.tecnica_escaneo.value!r} todavía no está "
-            f"implementada. Disponible: connect",
+            f"implementada.",
             file=sys.stderr,
         )
         return 2
@@ -170,13 +170,12 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _seleccionar_escaneo(tecnica: TecnicaEscaneo):
-    """Devuelve la implementación correspondiente a la técnica solicitada.
-
-    Las técnicas basadas en paquetes en crudo se incorporan en su jornada; hasta
-    entonces se informa explícitamente en lugar de sustituirlas en silencio, que
-    es lo que la decisión 009 pretende evitar.
-    """
-    return {TecnicaEscaneo.CONNECT: escanear_connect}.get(tecnica)
+    """Devuelve la implementación correspondiente a la técnica solicitada."""
+    return {
+        TecnicaEscaneo.CONNECT: escanear_connect,
+        TecnicaEscaneo.SYN: escanear_syn,
+        TecnicaEscaneo.ACK: escanear_ack,
+    }.get(tecnica)
 
 
 if __name__ == "__main__":
