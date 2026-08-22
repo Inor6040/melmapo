@@ -210,6 +210,35 @@ def _elegir_puerto_para_sonda(host: Host) -> int | None:
     return abiertos[0] if abiertos else None
 
 
+def _registrar_ttl_si_disponible(
+    host: Host,
+    ttl_de_pila: int | None,
+    origen_de_pila: str | None,
+    contribuciones: list,
+    senales: dict[str, str],
+) -> None:
+    """Registra la señal de TTL con la política de origen del apartado 5.
+
+    Se prefiere el observado por el descubrimiento ICMP: es una fase que se
+    diseñó específicamente para observarlo y ya lo tiene validado por origen
+    tras el cierre de R-41. Cuando no está disponible —caso frecuente cuando el
+    descubrimiento se resuelve por ARP en segmento local—, se aprovecha el de
+    la respuesta a la sonda de pila, que también contiene la información en su
+    capa IP. La procedencia se registra en el diccionario de señales para que
+    la memoria pueda auditar cualquier veredicto.
+    """
+    if host.ttl_observado is not None:
+        familia = _familia_por_ttl(host.ttl_observado)
+        senales["ttl"] = f"{host.ttl_observado} (icmp) → {familia.value}"
+        contribuciones.append((familia, PESO_TTL))
+        return
+
+    if ttl_de_pila and origen_de_pila:
+        familia = _familia_por_ttl(ttl_de_pila)
+        senales["ttl"] = f"{ttl_de_pila} ({origen_de_pila}) → {familia.value}"
+        contribuciones.append((familia, PESO_TTL))
+
+
 def _ponderar(
     contribuciones: list[tuple[FamiliaSO, int]],
 ) -> tuple[FamiliaSO, float]:
@@ -254,13 +283,9 @@ def _recoger_senales(
     contribuciones: list[tuple[FamiliaSO, int]] = []
     senales: dict[str, str] = {}
 
-    # 1. TTL, ya observado por el descubrimiento por ICMP.
-    if host.ttl_observado is not None:
-        familia = _familia_por_ttl(host.ttl_observado)
-        senales["ttl"] = f"{host.ttl_observado} → {familia.value}"
-        contribuciones.append((familia, PESO_TTL))
-
-    # 2 y 3. Puertos derivados del inventario, solo si se examinaron.
+    # 1. Señales derivadas del inventario, solo si los puertos correspondientes
+    #    se examinaron. La distinción entre «cerrado» y «no lo miramos» se
+    #    respeta en las funciones específicas.
     familia_135 = _senal_puerto_135(host, puertos_examinados)
     if familia_135 is not FamiliaSO.DESCONOCIDA:
         senales["puerto_135"] = familia_135.value
@@ -271,20 +296,34 @@ def _recoger_senales(
         senales["efimeros"] = familia_efimeros.value
         contribuciones.append((familia_efimeros, PESO_EFIMEROS))
 
-    # 4, 5 y 6. Sonda de pila: requiere un puerto abierto sobre el que enviar.
+    # 2. Sonda de pila: requiere un puerto abierto sobre el que enviar.
     objetivo = _elegir_puerto_para_sonda(host)
     if objetivo is None:
         registro.debug(
             "sin puertos abiertos en %s: se omite la sonda de pila", host.direccion,
         )
+        # Aun sin sonda, el TTL puede haber sido observado por otras fases.
+        _registrar_ttl_si_disponible(host, None, None, contribuciones, senales)
         return contribuciones, senales
 
     scapy = scapy_getter()
     respuesta = _sondear_pila(scapy, str(host.direccion), objetivo, espera_s)
     if respuesta is None or not respuesta.haslayer(scapy.TCP):
         senales["sonda_pila"] = "sin respuesta"
+        _registrar_ttl_si_disponible(host, None, None, contribuciones, senales)
         return contribuciones, senales
 
+    # 3. TTL. Se prefiere el observado por el descubrimiento ICMP —fase
+    #    específicamente diseñada para observarlo— cuando esté disponible; en
+    #    otro caso se aprovecha el de la sonda de pila que se acaba de emitir.
+    #    En el escenario del TFM, auditoría interna en segmento local, es
+    #    habitual que el descubrimiento se resuelva por ARP y el ICMP no llegue
+    #    a ejecutarse: aprovechar esta segunda fuente devuelve al modelo la
+    #    señal de mayor peso en aquellas circunstancias en que se perdería.
+    ttl_pila = int(getattr(respuesta[scapy.IP], "ttl", 0)) if respuesta.haslayer(scapy.IP) else 0
+    _registrar_ttl_si_disponible(host, ttl_pila, "sonda_pila", contribuciones, senales)
+
+    # 4, 5 y 6. Señales de pila propiamente dichas.
     orden = _leer_opciones(scapy, respuesta) or []
     if orden:
         familia_orden = _senal_orden_opciones(orden)

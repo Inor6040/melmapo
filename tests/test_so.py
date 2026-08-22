@@ -298,10 +298,58 @@ def test_sonda_sin_respuesta_registra_la_ausencia(monkeypatch):
 
     assert host.so.senales.get("sonda_pila") == "sin respuesta"
     # El TTL sí discrimina, aunque sin las señales de pila la confianza es baja.
-    assert host.so.senales["ttl"] == "64 → linux"
+    assert host.so.senales["ttl"] == "64 (icmp) → linux"
 
 
-def test_sin_ninguna_senal_devuelve_desconocida(monkeypatch):
+def test_ttl_de_la_sonda_de_pila_cuando_el_icmp_no_llego(monkeypatch):
+    """Escenario auditoría interna: descubrimiento por ARP, sin TTL en el host.
+
+    Es el caso que motivó la iteración. Metasploitable pertenece al segmento
+    local, ARP lo descubre por dirección física y ttl_observado queda a None.
+    Sin esta fuente alternativa, la señal más discriminante del modelo se
+    perdería exactamente en el escenario que la memoria prioriza.
+    """
+    host = _host(ttl=None, puertos=[
+        (22, EstadoPuerto.ABIERTO),
+        (139, EstadoPuerto.ABIERTO),   # SMB señuelo
+        (445, EstadoPuerto.ABIERTO),
+        (135, EstadoPuerto.CERRADO),
+    ])
+    respuesta = _Paquete(tcp={"options": [], "window": 5840})
+    # El _Paquete simulado no lleva capa IP: se inyecta a mano el TTL.
+    respuesta._capas["IP"] = _Capa(ttl=64)
+
+    monkeypatch.setattr(so, "_cargar", lambda: _ScapyFalso(respuesta))
+
+    so.identificar_host(host, _config([22, 135, 139, 445]))
+
+    assert "ttl" in host.so.senales
+    assert "(sonda_pila)" in host.so.senales["ttl"]
+    assert host.so.senales["ttl"].endswith("linux")
+
+
+def test_icmp_tiene_prioridad_sobre_la_sonda_de_pila(monkeypatch):
+    """Si ambas fuentes están disponibles, gana el ICMP: es la fase específica.
+
+    En la práctica los dos valores casi siempre coinciden, porque proceden del
+    mismo objetivo y el TTL inicial es el mismo. La prioridad se marca por
+    principio, para que sea inequívoco de dónde procede el dato en la salida.
+    """
+    host = _host(ttl=64, puertos=[(22, EstadoPuerto.ABIERTO)])
+    # La sonda de pila devuelve un TTL distinto para poder distinguirlo.
+    respuesta = _Paquete(tcp={"options": [], "window": 0})
+    respuesta._capas["IP"] = _Capa(ttl=128)
+
+    monkeypatch.setattr(so, "_cargar", lambda: _ScapyFalso(respuesta))
+
+    so.identificar_host(host, _config([22]))
+
+    # Se ha empleado el 64 del ICMP y se marca explícitamente la fuente.
+    assert "(icmp)" in host.so.senales["ttl"]
+    assert host.so.senales["ttl"].startswith("64")
+
+
+
     """Un host sin TTL, sin puertos y sin respuesta de pila queda indeterminado."""
     host = _host(ttl=None, puertos=[])
     monkeypatch.setattr(so, "_cargar", lambda: _ScapyFalso(None))
