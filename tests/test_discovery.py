@@ -87,7 +87,7 @@ class TestICMP:
     def test_respuesta_de_eco_es_activo(self, monkeypatch):
         falso = self._con(monkeypatch, None)
         falso._respuesta = _Respuesta({falso.ICMP: _Capa(type=0, code=0),
-                                       falso.IP: _Capa(ttl=64)})
+                                       falso.IP: _Capa(ttl=64, src=str(DESTINO))})
         activo, ttl = icmp.sondear(DESTINO, 1.0)
         assert activo is True
         assert ttl == 64
@@ -101,11 +101,24 @@ class TestICMP:
     def test_inalcanzable_no_es_activo(self, monkeypatch):
         """Un ICMP de inalcanzable procede de un intermedio, no del objetivo."""
         falso = self._con(monkeypatch, None)
+        # Se toma una dirección de intermediario coherente con la escena: la
+        # puerta de enlace del segmento habitual del laboratorio.
         falso._respuesta = _Respuesta({falso.ICMP: _Capa(type=3, code=13),
-                                       falso.IP: _Capa(ttl=64)})
+                                       falso.IP: _Capa(ttl=64, src="192.168.56.1")})
         activo, ttl = icmp.sondear(DESTINO, 1.0)
         assert activo is False
         # El tiempo de vida de un intermedio no caracteriza al objetivo.
+        assert ttl is None
+
+    def test_respuesta_de_origen_distinto_se_descarta(self, monkeypatch):
+        """R-41: aunque el tipo sea Echo Reply, si el origen no es el objetivo
+        no puede darse el equipo por vivo. Un paquete falsificado por cualquier
+        otro equipo del segmento haría lo posible por parecer legítimo."""
+        falso = self._con(monkeypatch, None)
+        falso._respuesta = _Respuesta({falso.ICMP: _Capa(type=0, code=0),
+                                       falso.IP: _Capa(ttl=64, src="192.168.56.99")})
+        activo, ttl = icmp.sondear(DESTINO, 1.0)
+        assert activo is False
         assert ttl is None
 
 

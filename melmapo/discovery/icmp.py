@@ -63,6 +63,20 @@ def sondear(
     if not respuesta.haslayer(scapy.ICMP):
         return False, None
 
+    # La respuesta debe proceder del objetivo. Un Echo Reply es unicast y
+    # legítimo solo si su origen coincide con el destino de la sonda; en otro
+    # caso podría tratarse de un paquete falsificado por cualquier equipo del
+    # segmento, o de un mensaje emitido por un dispositivo intermedio que se
+    # atribuiría erróneamente al objetivo. El caso del inalcanzable ya se
+    # rechazaba explícitamente por el mismo motivo; se generaliza aquí a toda
+    # respuesta antes de leer sus campos.
+    if str(respuesta[scapy.IP].src) != str(direccion):
+        registro.debug(
+            "respuesta ICMP desde %s no coincide con el objetivo %s; se descarta",
+            respuesta[scapy.IP].src, direccion,
+        )
+        return False, None
+
     tipo = int(respuesta[scapy.ICMP].type)
     ttl = int(respuesta[scapy.IP].ttl)
 
