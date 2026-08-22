@@ -34,6 +34,7 @@ T = TypeVar("T")
 R = TypeVar("R")
 
 TRABAJADORES_POR_DEFECTO = 50
+TRABAJADORES_FINGERPRINT_POR_DEFECTO = 10
 ESPERA_POR_DEFECTO_S = 2.0
 
 
@@ -45,6 +46,7 @@ class Configuracion:
     tecnicas_descubrimiento: list[TecnicaDescubrimiento] = field(default_factory=list)
     tecnica_escaneo: TecnicaEscaneo = TecnicaEscaneo.SYN
     trabajadores: int = TRABAJADORES_POR_DEFECTO
+    trabajadores_fingerprint: int = TRABAJADORES_FINGERPRINT_POR_DEFECTO
     espera_s: float = ESPERA_POR_DEFECTO_S
     interfaz: str | None = None
     omitir_descubrimiento: bool = False
@@ -56,6 +58,8 @@ class Configuracion:
     def __post_init__(self) -> None:
         if self.trabajadores < 1:
             raise ValueError("el número de trabajadores debe ser al menos 1")
+        if self.trabajadores_fingerprint < 1:
+            raise ValueError("el número de trabajadores de fingerprint debe ser al menos 1")
         if self.espera_s <= 0:
             raise ValueError("el tiempo de espera debe ser positivo")
         if self._limitador is None:
@@ -98,6 +102,7 @@ class Configuracion:
             "tecnicas_descubrimiento": ejecutadas,
             "tecnica_escaneo": self.tecnica_escaneo.value,
             "trabajadores": self.trabajadores,
+            "trabajadores_fingerprint": self.trabajadores_fingerprint,
             "espera_s": self.espera_s,
             "omitir_descubrimiento": self.omitir_descubrimiento,
         }

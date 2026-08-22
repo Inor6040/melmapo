@@ -24,7 +24,7 @@ import logging
 from typing import Callable
 
 from ..core.modelo import EstadoPuerto, Host, Puerto, Servicio
-from ..core.orquestador import Configuracion
+from ..core.orquestador import Configuracion, en_paralelo
 from . import extraccion
 from .red import dialogar as _dialogar
 
@@ -66,15 +66,25 @@ def identificar_host(host: Host, config: Configuracion) -> Host:
     Los que ya tuvieran servicio identificado por otra técnica se dejan
     intactos, en previsión del orden de fases que se acuerde en el capítulo
     quinto.
+
+    Los puertos pendientes se sondean en paralelo con la cota específica del
+    fingerprint. Sin paralelización, un rango amplio en el que abundara HTTP en
+    silencio agotaría un temporizador completo por cada puerto sondeado, lo que
+    haría inviable el análisis en escenarios con decenas de puertos abiertos por
+    host.
     """
     direccion = str(host.direccion)
-    for puerto in host.puertos:
-        if puerto.estado is not EstadoPuerto.ABIERTO:
-            continue
-        if puerto.servicio is not None and puerto.servicio.esta_identificado():
-            continue
-        # Se pasa ``_dialogar`` explícitamente y no se deja como valor por
-        # defecto: el valor por defecto se resuelve al importar, mientras que
-        # las pruebas necesitan sustituirlo en el módulo ya cargado.
-        identificar_puerto(direccion, puerto, config.espera_s, _dialogar)
+    pendientes = [
+        p for p in host.puertos
+        if p.estado is EstadoPuerto.ABIERTO
+        and (p.servicio is None or not p.servicio.esta_identificado())
+    ]
+    if not pendientes:
+        return host
+
+    en_paralelo(
+        lambda p: identificar_puerto(direccion, p, config.espera_s, _dialogar),
+        pendientes,
+        config.trabajadores_fingerprint,
+    )
     return host

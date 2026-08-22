@@ -154,6 +154,79 @@ def test_banner_respeta_servicio_previamente_identificado(monkeypatch):
 
 
 # --------------------------------------------------------------------------
+# Paralelización dentro del host
+# --------------------------------------------------------------------------
+
+def test_banner_paraleliza_los_puertos_de_un_host(monkeypatch):
+    """La suma de esperas de todos los puertos debe caber en menos que su suma
+    secuencial. Se emula un servicio lento con time.sleep."""
+    import time
+
+    ESPERA = 0.2
+
+    def lento(direccion, puerto, espera_s):
+        time.sleep(ESPERA)
+        return "SSH-2.0-OpenSSH_9.6p1"
+
+    monkeypatch.setattr(banner, "_dialogar", lento)
+
+    host = Host(direccion=IPv4Address("192.0.2.20"), activo=True)
+    host.puertos.extend(_puerto_abierto(n) for n in (22, 80, 443, 3306, 25))
+    config = Configuracion(
+        objetivos=[IPv4Address("192.0.2.20")],
+        puertos=[22, 80, 443, 3306, 25],
+        espera_s=1.0,
+        trabajadores_fingerprint=5,
+    )
+
+    inicio = time.perf_counter()
+    banner.identificar_host(host, config)
+    duracion = time.perf_counter() - inicio
+
+    # Cinco puertos sondeados en paralelo tardan del orden de una espera; en
+    # serie tardarían cinco. Se toma un margen holgado para no depender del
+    # planificador del sistema.
+    assert duracion < ESPERA * 3
+
+
+def test_http_paraleliza_los_puertos_de_un_host(monkeypatch):
+    import time
+
+    ESPERA = 0.2
+
+    def lento(direccion, puerto, espera_s, estimulo):
+        time.sleep(ESPERA)
+        return RESPUESTA_APACHE
+
+    monkeypatch.setattr(http, "_dialogar", lento)
+
+    host = Host(direccion=IPv4Address("192.0.2.20"), activo=True)
+    host.puertos.extend(_puerto_abierto(n) for n in (80, 8080, 8443, 8000))
+    config = Configuracion(
+        objetivos=[IPv4Address("192.0.2.20")],
+        puertos=[80, 8080, 8443, 8000],
+        espera_s=1.0,
+        trabajadores_fingerprint=4,
+    )
+
+    inicio = time.perf_counter()
+    http.identificar_host(host, config)
+    duracion = time.perf_counter() - inicio
+
+    assert duracion < ESPERA * 3
+
+
+def test_configuracion_valida_trabajadores_fingerprint():
+    """La cota específica debe someterse a la misma validación que la general."""
+    with pytest.raises(ValueError, match="fingerprint"):
+        Configuracion(
+            objetivos=[IPv4Address("192.0.2.20")],
+            puertos=[22],
+            trabajadores_fingerprint=0,
+        )
+
+
+# --------------------------------------------------------------------------
 # HTTP
 # --------------------------------------------------------------------------
 

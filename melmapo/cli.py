@@ -70,6 +70,10 @@ def construir_analizador() -> argparse.ArgumentParser:
     a.add_argument("-i", "--interfaz", default=None, help="interfaz de red a emplear")
     a.add_argument("-t", "--trabajadores", type=int, default=50,
                    help="número máximo de hilos simultáneos (por defecto, 50)")
+    a.add_argument("--trabajadores-fingerprint", type=int, default=10,
+                   help="hilos simultáneos por host durante la identificación de servicios "
+                        "(por defecto, 10). Cota separada de --trabajadores para no imponer "
+                        "sobre cada objetivo la misma carga que sobre el barrido de hosts")
     a.add_argument("-w", "--espera", type=float, default=2.0,
                    help="tiempo de espera de respuesta en segundos (por defecto, 2.0)")
     a.add_argument("-o", "--salida", default=None, help="fichero JSON de resultados")
@@ -112,6 +116,7 @@ def construir_configuracion(args: argparse.Namespace) -> Configuracion:
         tecnicas_descubrimiento=_parsear_descubrimiento(args.descubrimiento),
         tecnica_escaneo=TecnicaEscaneo(args.tecnica),
         trabajadores=args.trabajadores,
+        trabajadores_fingerprint=args.trabajadores_fingerprint,
         espera_s=args.espera,
         interfaz=args.interfaz,
         omitir_descubrimiento=args.sin_descubrimiento,

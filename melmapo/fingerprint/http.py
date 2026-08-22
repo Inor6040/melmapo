@@ -26,7 +26,7 @@ import logging
 from typing import Callable
 
 from ..core.modelo import EstadoPuerto, Host, Puerto, Servicio
-from ..core.orquestador import Configuracion
+from ..core.orquestador import Configuracion, en_paralelo
 from . import extraccion
 from .red import dialogar as _dialogar
 
@@ -113,12 +113,22 @@ def identificar_host(host: Host, config: Configuracion) -> Host:
     interna quedaría fuera— y dejar que el estímulo elemental resuelva por sí
     solo. El coste de un estímulo perdido en un puerto que no habla HTTP es
     despreciable en un pentesting interno.
+
+    Los puertos pendientes se sondean en paralelo con la cota específica del
+    fingerprint, por el mismo motivo que en el banner grabbing.
     """
     direccion = str(host.direccion)
-    for puerto in host.puertos:
-        if puerto.estado is not EstadoPuerto.ABIERTO:
-            continue
-        if puerto.servicio is not None and puerto.servicio.esta_identificado():
-            continue
-        identificar_puerto(direccion, puerto, config.espera_s, _dialogar)
+    pendientes = [
+        p for p in host.puertos
+        if p.estado is EstadoPuerto.ABIERTO
+        and (p.servicio is None or not p.servicio.esta_identificado())
+    ]
+    if not pendientes:
+        return host
+
+    en_paralelo(
+        lambda p: identificar_puerto(direccion, p, config.espera_s, _dialogar),
+        pendientes,
+        config.trabajadores_fingerprint,
+    )
     return host
