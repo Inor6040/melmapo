@@ -20,6 +20,7 @@ from .core import (
 )
 from .core.privilegios import exigir_privilegios_o_salir
 from .discovery import descubrir
+from .fingerprint import identificar_host as identificar
 from .output import guardar_json, tabla_consola
 from .scanning import escanear_ack, escanear_connect, escanear_syn
 
@@ -155,6 +156,7 @@ def main(argv: list[str] | None = None) -> int:
             config,
             descubrimiento=None if config.omitir_descubrimiento else descubrir,
             escaneo=escaneo,
+            fingerprint=identificar,
         ).ejecutar()
     except KeyboardInterrupt:
         print("\ninterrumpido por el operador", file=sys.stderr)
