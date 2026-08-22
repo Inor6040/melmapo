@@ -362,6 +362,11 @@ def test_cascada_solo_recurre_a_http_para_puertos_sin_identificar(monkeypatch):
 
     monkeypatch.setattr(banner, "_dialogar", falso_banner)
     monkeypatch.setattr(http, "_dialogar", falso_http)
+    # La fachada llama también a so.identificar_host, que sondearía la pila
+    # con Scapy. Se sustituye por una función que registre el paso sin abrir
+    # sockets: la detección de SO tiene su propia batería de pruebas.
+    from melmapo.fingerprint import so as _so
+    monkeypatch.setattr(_so, "identificar_host", lambda h, c: h)
 
     config = Configuracion(
         objetivos=[IPv4Address("192.0.2.20")], puertos=[22, 80], espera_s=1.0,
