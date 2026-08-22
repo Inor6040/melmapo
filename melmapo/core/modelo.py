@@ -72,7 +72,17 @@ class Servicio:
     cabeceras: dict[str, str] = field(default_factory=dict)
 
     def esta_identificado(self) -> bool:
-        return self.nombre is not None
+        """Un servicio se considera identificado si se conoce su nombre o su versión.
+
+        Basta cualquiera de las dos porque ambas atribuyen información al puerto
+        que un sondeo posterior no aportaría: si el banner declaró la versión
+        pero el patrón no supo asignarle nombre —caso de MySQL, que en el saludo
+        binario declara la versión pero no una marca reconocible sin un caso
+        especial—, repetir la sonda con HTTP solo produciría ruido, y de hecho
+        producía una respuesta binaria mal interpretada que sustituía la
+        información ya obtenida.
+        """
+        return self.nombre is not None or self.version is not None
 
 
 @dataclass

@@ -52,6 +52,18 @@ _PATRONES: tuple[tuple[str, re.Pattern[str]], ...] = (
     )),
 )
 
+_PATRON_MYSQL = next(p for n, p in _PATRONES if n == "mysql")
+
+
+def _es_patron_mysql(patron: re.Pattern[str]) -> bool:
+    """Indica si el patrón dado es el que reconoce el formato de versión MySQL.
+
+    Se prefiere esta comparación por identidad a exponer el nombre del patrón
+    fuera del módulo: los nombres son detalle interno, mientras que la relación
+    entre un patrón y su singularidad de post-proceso es lo que aquí importa.
+    """
+    return patron is _PATRON_MYSQL
+
 
 def extraer(banner: str) -> tuple[str | None, str | None]:
     """Extrae nombre y versión de un banner.
@@ -75,12 +87,16 @@ def extraer(banner: str) -> tuple[str | None, str | None]:
         grupos = coincidencia.groupdict()
         nombre = grupos.get("nombre")
         version = grupos.get("version")
-        # MariaDB se anuncia dentro del propio saludo binario; el patrón mysql
-        # solo captura la versión numérica, de modo que la marca del producto se
-        # infiere aquí a partir del banner completo. Es la única singularidad
-        # que justifica un caso especial fuera del propio patrón.
-        if nombre is None and version and "MariaDB" in fragmento:
-            nombre = "MariaDB"
+        # El patrón mysql solo captura la versión numérica: la marca del
+        # producto se infiere aquí a partir del banner completo. MariaDB tiene
+        # prioridad sobre MySQL porque el saludo binario de MariaDB también
+        # anuncia una versión con el formato de MySQL; MySQL puro, en cambio, no
+        # menciona nunca MariaDB.
+        if nombre is None and version:
+            if "MariaDB" in fragmento:
+                nombre = "MariaDB"
+            elif _es_patron_mysql(patron):
+                nombre = "MySQL"
         if nombre or version:
             return nombre, version
 

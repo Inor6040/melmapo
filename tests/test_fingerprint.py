@@ -37,11 +37,14 @@ from melmapo.fingerprint import banner, extraccion, http, identificar_host
         ("Apache/2.4.58 (Ubuntu)", "Apache", "2.4.58"),
         ("nginx/1.24.0", "nginx", "1.24.0"),
         ("Microsoft-IIS/10.0", "Microsoft-IIS", "10.0"),
-        # MySQL/MariaDB: la versión llega como parte del saludo binario
-        ("5.5.61-0ubuntu0.14.04.1", None, "5.5.61-0ubuntu0.14.04.1"),
+        # MySQL/MariaDB: la versión llega como parte del saludo binario. MySQL
+        # puro no incluye ninguna marca, de modo que el nombre lo aporta el
+        # post-proceso a partir de la identidad del patrón que ha coincidido.
+        ("5.5.61-0ubuntu0.14.04.1", "MySQL", "5.5.61-0ubuntu0.14.04.1"),
         ("10.6.12-MariaDB-1", "MariaDB", "10.6.12-MariaDB-1"),
-        # MySQL con versión de dos números y sufijo, tomada del propio saludo binario
-        (">\u0000\u0000\u0000\n5.0.51a-3ubuntu5\u0000\n\u0000\u0000\u0000mqp", None, "5.0.51a-3ubuntu5"),
+        # MySQL con versión de dos números y sufijo, tomada del propio saludo
+        # binario. Fragmento real observado contra Metasploitable 2.
+        (">\x00\x00\x00\n5.0.51a-3ubuntu5\x00\n\x00\x00\x00mqp", "MySQL", "5.0.51a-3ubuntu5"),
         # Casos que la heurística no distingue: se aceptan como limitación.
         ("", None, None),
         ("+OK POP3 server ready", None, None),
@@ -58,6 +61,29 @@ def test_extraccion_no_devuelve_nada_ante_ausencia_total_de_patron():
     nombre, version = extraccion.extraer("mensaje libre sin producto ni version conocidos")
     assert nombre is None
     assert version is None
+
+
+def test_extraccion_no_atribuye_mysql_ante_version_generica():
+    """El post-proceso que atribuye MySQL debe ceñirse al patrón mysql.
+
+    Una versión de tres números como «2.4.58» capturada por otro patrón —típica
+    de un servidor web— no debe llevarse el nombre MySQL por el hecho de que
+    encaje también en el formato del patrón mysql.
+    """
+    nombre, version = extraccion.extraer("Apache/2.4.58 (Ubuntu)")
+    assert nombre == "Apache"
+    assert version == "2.4.58"
+
+
+def test_servicio_con_solo_version_esta_identificado():
+    """Sin esta pieza, la cascada volvía a sondear el puerto con HTTP y perdía
+    la información previa. Reproduce el bug observado con MySQL 3306."""
+    from melmapo.core.modelo import Servicio
+    assert Servicio(nombre="Apache", version="2.4.58").esta_identificado()
+    assert Servicio(nombre=None, version="5.0.51a-3ubuntu5").esta_identificado()
+    assert Servicio(nombre="Postfix", version=None).esta_identificado()
+    assert not Servicio().esta_identificado()
+    assert not Servicio(banner_bruto="algo sin extraer").esta_identificado()
 
 
 # --------------------------------------------------------------------------
@@ -290,6 +316,27 @@ def test_http_deja_puerto_intacto_si_no_hay_respuesta():
         "192.0.2.20", puerto, espera_s=1.0, dialogar=lambda *_a: None,
     )
     assert puerto.servicio is None
+
+
+def test_http_no_sobreescribe_servicio_previo_cuando_la_respuesta_no_es_http():
+    """El caso MySQL: banner grabbing ya extrajo versión de otro protocolo, y
+    HTTP recibe basura binaria acompañada de «Bad handshake». No debe
+    sobreescribir la información previa con una envoltura sin nombre ni
+    versión."""
+    from melmapo.core.modelo import Servicio
+    puerto = _puerto_abierto(numero=3306)
+    puerto.servicio = Servicio(
+        nombre="MySQL", version="5.0.51a", banner_bruto="saludo binario previo",
+    )
+
+    http.identificar_puerto(
+        "192.0.2.20", puerto, espera_s=1.0,
+        dialogar=lambda *_a: "basura binaria... Bad handshake",
+    )
+
+    assert puerto.servicio.nombre == "MySQL"
+    assert puerto.servicio.version == "5.0.51a"
+    assert puerto.servicio.banner_bruto == "saludo binario previo"
 
 
 # --------------------------------------------------------------------------

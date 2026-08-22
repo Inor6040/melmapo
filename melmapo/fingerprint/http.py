@@ -81,12 +81,15 @@ def identificar_puerto(
 
     estado, cabeceras = _dividir(respuesta)
     if not estado.upper().startswith("HTTP/"):
-        # La respuesta no es HTTP: probablemente el módulo de banner ya intentó
-        # con este puerto y no obtuvo nada precisamente porque el servicio
-        # espera un estímulo específico distinto. Se registra la respuesta como
-        # banner en bruto para poder auditar el caso, pero no se atribuye
-        # nombre.
-        puerto.servicio = Servicio(banner_bruto=respuesta)
+        # La respuesta no es HTTP: probablemente el módulo de banner obtuvo aquí
+        # el saludo específico de otro protocolo y su servicio ya estaba
+        # registrado. La respuesta a esta sonda es basura desde el punto de
+        # vista del servicio real —el ejemplo típico es MySQL, que ante un GET
+        # devuelve un fragmento binario acompañado de «Bad handshake»—, de modo
+        # que sobreescribir aquí el servicio previo sería perder información. Se
+        # registra solo si no había nada.
+        if puerto.servicio is None:
+            puerto.servicio = Servicio(banner_bruto=respuesta)
         return
 
     server = cabeceras.get("server", "")
