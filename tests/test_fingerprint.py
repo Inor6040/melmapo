@@ -40,6 +40,8 @@ from melmapo.fingerprint import banner, extraccion, http, identificar_host
         # MySQL/MariaDB: la versión llega como parte del saludo binario
         ("5.5.61-0ubuntu0.14.04.1", None, "5.5.61-0ubuntu0.14.04.1"),
         ("10.6.12-MariaDB-1", "MariaDB", "10.6.12-MariaDB-1"),
+        # MySQL con versión de dos números y sufijo, tomada del propio saludo binario
+        (">\u0000\u0000\u0000\n5.0.51a-3ubuntu5\u0000\n\u0000\u0000\u0000mqp", None, "5.0.51a-3ubuntu5"),
         # Casos que la heurística no distingue: se aceptan como limitación.
         ("", None, None),
         ("+OK POP3 server ready", None, None),

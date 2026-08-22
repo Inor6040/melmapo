@@ -40,7 +40,7 @@ _PATRONES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("ftp_paren", re.compile(r"^220[\s-].*?\(?\b(?P<nombre>[A-Za-z][\w\-]+)\s+(?P<version>[\d.][\w.\-]*)\)?")),
     # MySQL/MariaDB en el saludo binario: la versión aparece en ASCII separada por 0x00.
     #   5.5.61-0ubuntu0.14.04.1  |  8.0.32  |  10.6.12-MariaDB-1
-    ("mysql", re.compile(r"(?P<version>\d+\.\d+\.\d+[\w.\-]*)")),
+    ("mysql", re.compile(r"(?P<version>\d+\.\d+(?:\.\d+)?[\w.\-]+)")),
     # Genérico «nombre/versión» en cualquier posición: cubre productos que se
     # anuncian como «Producto/1.2.3» dentro de un texto más amplio.
     ("generico_barra", re.compile(r"\b(?P<nombre>[A-Za-z][\w\-.]{1,30})/(?P<version>\d[\w.\-]*)")),
