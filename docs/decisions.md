@@ -574,6 +574,183 @@ respondidas se incorpora al modelo de datos y a ambas salidas.
 
 ---
 
+---
+
+## 018 — Uso de envío por lotes en las técnicas basadas en paquetes en crudo
+
+La primera implementación del escaneo por saludo parcial —requisito 2— empleó el patrón habitual
+del escaneo por conexión completa: un pool de hilos, uno por puerto, cada uno invocando `sr1` de
+Scapy y esperando su respuesta antes de emitir el siguiente. El código pasaba las pruebas unitarias
+—que sustituían Scapy por un doble— y funcionaba correctamente contra un único puerto. Al
+ejecutarlo contra el laboratorio con siete puertos, los siete se declararon como filtrados en tres
+ejecuciones consecutivas, resultado que la verdad-terreno del apartado 6.3 refutaba
+inmediatamente.
+
+El diagnóstico se realizó siguiendo la disciplina en cuatro pasos que se ha adoptado desde entonces
+como convención del proyecto: reducción a caso mínimo —un puerto y un hilo, veredicto correcto—,
+contraste con la técnica alternativa —conexión completa, seis puertos abiertos—, instrumentación
+con `tcpdump` filtrando solo el tráfico relevante, y aislamiento de Scapy con un script de tres
+líneas. La captura reveló que la técnica emitía correctamente los siete SYN y recibía sus SYN/ACK,
+pero las respuestas no llegaban al hilo que las esperaba. La causa: `sr1` no es seguro entre hilos
+—cada llamada abre su propio socket en crudo y filtra el tráfico contra el paquete emitido—, y el
+envío del reinicio adicional que aborta cada conexión abierta introduce interferencia con las
+llamadas simultáneas de los demás hilos.
+
+Se valoraron dos alternativas para la corrección. La primera consistía en serializar los sondeos
+crudos con un cerrojo global: preserva el modelo de un temporizador por puerto —afirmación
+temporal del apartado 3.2.4 en su formulación original— pero hace la técnica más lenta que la
+conexión completa, resultado contrario a la teoría. La segunda consistía en migrar a envío por
+lotes con `sr`, que despacha la tanda entera y recoge después las respuestas: es la solución que ya
+empleaba el barrido ARP con `srp` desde el inicio del proyecto.
+
+**Se adopta el envío por lotes**. Se aplica al saludo parcial y también al escaneo ACK —requisito
+3—, pese a que este último funcionaba correctamente con el modelo original, para que la
+comparativa de tiempos del capítulo sexto no midiera una diferencia de implementación en lugar de
+una diferencia de técnica.
+
+La decisión tiene una consecuencia sobre la afirmación del apartado 3.2.4, que hubo de ser
+reformulada. La formulación original —«el coste depende del número de puertos filtrados, no de los
+examinados»— era cierta bajo el modelo de un temporizador por puerto, pero deja de serlo con
+envío por lotes: todos los puertos que no responden agotan un único temporizador compartido, de
+modo que basta un solo puerto filtrado para que la exploración deba aguardar a que expire el plazo
+completo. La formulación revisada describe esta asimetría como propiedad del protocolo y no como
+consecuencia de la implementación, y se verifica experimentalmente en el subapartado 6.5.2 con las
+mediciones sobre los tres hosts del laboratorio.
+
+---
+
+## 019 — Aleatorización del puerto de origen en las sondas crudas
+
+La captura de tráfico realizada durante el diagnóstico de la decisión 018 reveló un detalle
+adicional: Scapy fija por defecto el puerto de origen al 20 —FTP data— cuando se construye un
+segmento TCP sin especificar el campo `sport`. Un cortafuegos con reglas heredadas para tráfico
+FTP podría tratar ese puerto de manera especial —por ejemplo, permitiendo el retorno de
+conexiones—, lo que falsearía los resultados de una exploración legítima.
+
+Las alternativas consideradas eran mantener el valor por defecto de Scapy y documentar la
+limitación; fijar un puerto arbitrario elegido por el proyecto; o tomar uno del rango efímero como
+hacen las herramientas de referencia. La primera contamina las mediciones sin necesidad. La
+segunda produce una firma reconocible que un dispositivo de detección de intrusiones podría
+aprovechar. La tercera imita el comportamiento de un cliente legítimo y evita ambos problemas.
+
+**Se elige un puerto del rango efímero**, entre 32768 y 60999 —los límites que emplea Linux por
+defecto—, una vez por tanda de envío. La variación paquete a paquete impediría a Scapy emparejar
+cada respuesta con la sonda que la provocó, motivo por el que el puerto se mantiene constante
+dentro de una misma tanda y se renueva entre tandas.
+
+La consecuencia es doble: se elimina una posible fuente de falseo en las mediciones —presencia de
+reglas heredadas para FTP en el objetivo— y se reduce la firma característica del tráfico emitido
+por la herramienta, aunque este último efecto queda parcialmente contrarrestado por la propia
+estructura del envío por lotes, que resulta reconocible con independencia del puerto de origen.
+
+---
+
+## 020 — Estrategia de identificación de servicios: leer antes que estimular
+
+Los requisitos 4 y 5 del enunciado —obtención de versión por banner y por cabeceras HTTP— exigen
+distinguir cuándo un servicio se declara espontáneamente al establecerse la conexión y cuándo
+requiere ser interrogado. Se valoraron dos estrategias contrapuestas.
+
+La primera consistía en enviar una sonda genérica —una petición HTTP `GET`— a todo puerto abierto,
+leer la respuesta y clasificar. Es simple de implementar y no requiere lógica por protocolo. La
+segunda, en conectar al puerto, leer durante un plazo corto lo que el servicio emita por
+iniciativa propia, y estimular solo aquellos puertos que no hayan dicho nada en el paso anterior.
+
+Un análisis somero revela que la primera alternativa produce ruido innecesario en las trazas de
+los servicios que ya iban a declararse por sí solos —SSH y SMTP, por ejemplo, registran una
+petición HTTP como intento de acceso malformado— y, en el caso de protocolos binarios como MySQL,
+provoca el cierre de la conexión antes de haber leído el saludo. Adicionalmente, el propio
+apartado 3.4.2 de la memoria describe el mecanismo en el orden inverso al de esta alternativa:
+primero los servicios que emiten mensaje de bienvenida, después los que exigen estímulo.
+
+**Se adopta la estrategia de lectura primero y estímulo después.** El módulo de banner —requisito
+4— se limita a leer al conectar y clasifica el puerto como no identificado si el servicio no
+emite nada. El módulo de HTTP —requisito 5— se aplica en segunda instancia solo a los puertos que
+hayan quedado sin identificar, con una petición mínima `GET / HTTP/1.0`. La cascada se realiza
+dentro de la fase de fingerprinting sin intervención del operador.
+
+Se asume una consecuencia menor: los servicios de protocolo binario que no emitan una cadena
+legible al conectar —SMB, NetBIOS, telnet con negociación de opciones— quedan sin identificar. La
+alternativa habría exigido implementar un catálogo de sondas específicas por protocolo, tarea que
+excede el alcance del trabajo y que se recoge como línea futura en el capítulo séptimo.
+
+---
+
+## 021 — Doble fuente de tiempo de vida en la detección de sistema operativo
+
+La primera ejecución del módulo de detección de sistema operativo —requisito 6, decisión 013—
+contra el laboratorio devolvió el veredicto Windows para Metasploitable con confianza del 60 %.
+El sistema es Linux con firma SMB señuelo, según se documentó en el apartado 6.3, y la
+clasificación errónea era el caso adverso deliberado que el modelo debía resolver correctamente.
+
+El análisis del fichero JSON de salida reveló la causa. La señal de tiempo de vida —la de mayor
+peso del modelo, con peso 4 sobre 15— aparecía como `null` en los tres hosts. En el escenario
+prioritario del trabajo, auditoría interna sobre un segmento local, el descubrimiento se resuelve
+por resolución en capa de enlace —ARP— en todos los objetivos, y la fase ICMP no llega a
+ejecutarse. La señal de mayor peso del modelo quedaba ausente precisamente en el escenario que la
+memoria prioriza.
+
+Se identificaron tres opciones. La primera consistía en modificar la firma del modelo para que la
+ausencia de marcas de tiempo TCP no puntuase en contra —Metasploitable las omite pero también lo
+haría un Linux moderno con esa opción desactivada—. La segunda, en aceptar la clasificación
+errónea y explicarla en la memoria como límite del modelo sobre pilas anteriores a 2010. La
+tercera, en obtener el tiempo de vida de la respuesta a la sonda de pila que el módulo ya emite,
+en lugar de depender exclusivamente del ICMP.
+
+Las dos primeras exigían modificar el modelo *a posteriori* a partir del resultado observado,
+práctica que invalida cualquier validación empírica. La tercera reutilizaba información que ya
+circulaba por el código y resolvía el problema estructural sin ajustar el modelo.
+
+**Se adopta la tercera opción: doble fuente del tiempo de vida.** El módulo prefiere el observado
+por el descubrimiento por ICMP —fase específicamente diseñada para observarlo, con validación por
+dirección de origen tras el cierre de R-41— cuando esté disponible, y aprovecha el de la respuesta
+a la sonda de pila cuando el ICMP no lo aportó. La procedencia se anota en el diccionario de
+señales del resultado, en la forma `64 (icmp) → linux` o `64 (sonda_pila) → linux`, para que
+cualquier veredicto sea auditable.
+
+El resultado sobre el laboratorio pasa de Windows con 60 % a Linux con 57 %, veredicto correcto
+que refleja fielmente la ambigüedad real del caso adverso —firma parcial con Windows moderno— sin
+ocultarla ni ajustar el modelo a conveniencia.
+
+---
+
+## 022 — Umbral de identificación de servicio
+
+Al ejecutar por primera vez la cascada de identificación de servicios contra el laboratorio, el
+puerto 3306 de Metasploitable quedaba sin identificar pese a que la extracción heurística sobre su
+banner aislado devolvía la versión correcta. El diagnóstico reveló tres causas concurrentes que
+compartían un mismo origen: el criterio con que la clase `Servicio` del modelo de datos declara
+que un puerto ha sido identificado.
+
+La primera implementación del método `esta_identificado()` devolvía cierto únicamente cuando el
+campo `nombre` estaba asignado. Un banner del que la extracción heurística obtenía versión pero
+del que no se podía derivar nombre —caso de MySQL, cuyo saludo binario contiene la cadena
+`5.0.51a-3ubuntu5` pero no una marca reconocible sin un caso especial— se declaraba no
+identificado. La cascada del fingerprint, al considerarlo no identificado, volvía a sondearlo con
+HTTP; MySQL respondía con basura binaria y un mensaje `Bad handshake`, y esa respuesta terminaba
+sobreescribiendo la información previa.
+
+**Se adopta un criterio más laxo:** un servicio se declara identificado si conoce su nombre o su
+versión, entendiendo que ambas atribuyen información al puerto que un sondeo posterior no
+aportaría. La modificación se acompaña de dos cambios de refuerzo en la cascada: el patrón MySQL
+atribuye la marca a partir de la identidad del patrón que coincidió —con prioridad para MariaDB
+cuando aparece explícitamente en el banner—, y el módulo HTTP preserva el servicio existente si
+la respuesta recibida no es HTTP, en lugar de sobreescribirlo con la envoltura vacía que producía
+antes.
+
+Las tres correcciones se realizan en un único cambio, por ser tres facetas del mismo problema. La
+prueba de aceptación consiste en la ejecución contra Metasploitable, que pasa de mostrar el 3306
+sin identificar a mostrarlo como MySQL 5.0.51a-3ubuntu5, veredicto verificable en el apartado
+6.5.4 de la memoria.
+
+Se asume una consecuencia: puede haber otros protocolos binarios cuya versión se extraiga
+correctamente sin nombre reconocido, y en ese caso el nombre quedará ausente en la salida. La
+política del proyecto —conservar el `banner_bruto` en todos los casos— permite que el auditor
+compruebe la naturaleza del servicio a partir de la evidencia bruta cuando la extracción
+heurística no baste.
+
+---
+
 ## Consideraciones éticas y legales
 
 Todas las pruebas se ejecutan contra infraestructura propia, desplegada en un segmento virtual
