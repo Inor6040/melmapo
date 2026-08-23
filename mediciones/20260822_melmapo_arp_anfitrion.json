@@ -1,0 +1,122 @@
+{
+  "hosts": [
+    {
+      "direccion": "192.168.56.1",
+      "activo": true,
+      "mac": null,
+      "fabricante": null,
+      "tecnicas_respondidas": [],
+      "ttl_observado": null,
+      "puertos": [
+        {
+          "numero": 22,
+          "protocolo": "tcp",
+          "estado": "filtrado",
+          "tecnica": "syn",
+          "servicio": null,
+          "latencia_ms": 2102.9
+        }
+      ],
+      "so": null
+    },
+    {
+      "direccion": "192.168.56.20",
+      "activo": true,
+      "mac": null,
+      "fabricante": null,
+      "tecnicas_respondidas": [],
+      "ttl_observado": null,
+      "puertos": [
+        {
+          "numero": 22,
+          "protocolo": "tcp",
+          "estado": "abierto",
+          "tecnica": "syn",
+          "servicio": {
+            "nombre": "OpenSSH",
+            "version": "4.7p1",
+            "banner_bruto": "SSH-2.0-OpenSSH_4.7p1 Debian-8ubuntu1\n",
+            "cabeceras": {}
+          },
+          "latencia_ms": 74.06
+        }
+      ],
+      "so": {
+        "familia": "windows",
+        "confianza": 0.6,
+        "senales": {
+          "ttl": "64 (sonda_pila) → linux",
+          "opciones_tcp": "MSS, NOP, NOP, SAckOK, NOP, WScale → windows",
+          "timestamps": "ausentes → windows",
+          "ventana": "5840 → desconocida"
+        }
+      }
+    },
+    {
+      "direccion": "192.168.56.30",
+      "activo": true,
+      "mac": null,
+      "fabricante": null,
+      "tecnicas_respondidas": [],
+      "ttl_observado": null,
+      "puertos": [
+        {
+          "numero": 22,
+          "protocolo": "tcp",
+          "estado": "abierto",
+          "tecnica": "syn",
+          "servicio": {
+            "nombre": "OpenSSH",
+            "version": "10.2p1",
+            "banner_bruto": "SSH-2.0-OpenSSH_10.2p1 Ubuntu-2ubuntu3\r\n",
+            "cabeceras": {}
+          },
+          "latencia_ms": 82.3
+        }
+      ],
+      "so": {
+        "familia": "linux",
+        "confianza": 1.0,
+        "senales": {
+          "ttl": "64 (sonda_pila) → linux",
+          "opciones_tcp": "MSS, SAckOK, Timestamp, NOP, WScale → linux",
+          "timestamps": "presentes → linux",
+          "ventana": "65160 → linux"
+        }
+      }
+    },
+    {
+      "direccion": "192.168.56.40",
+      "activo": true,
+      "mac": null,
+      "fabricante": null,
+      "tecnicas_respondidas": [],
+      "ttl_observado": null,
+      "puertos": [
+        {
+          "numero": 22,
+          "protocolo": "tcp",
+          "estado": "cerrado",
+          "tecnica": "syn",
+          "servicio": null,
+          "latencia_ms": 81.81
+        }
+      ],
+      "so": null
+    }
+  ],
+  "inicio": "2026-08-22T23:38:41.115628+00:00",
+  "fin": "2026-08-22T23:38:45.531991+00:00",
+  "parametros": {
+    "objetivos": 4,
+    "puertos": 1,
+    "protocolo": "tcp",
+    "tecnicas_descubrimiento": [],
+    "tecnica_escaneo": "syn",
+    "trabajadores": 50,
+    "trabajadores_fingerprint": 10,
+    "espera_s": 2.0,
+    "omitir_descubrimiento": true
+  },
+  "duracion_s": 4.416363
+}

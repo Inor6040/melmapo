@@ -1,0 +1,213 @@
+{
+  "hosts": [
+    {
+      "direccion": "192.168.56.20",
+      "activo": true,
+      "mac": null,
+      "fabricante": null,
+      "tecnicas_respondidas": [
+        "tcp"
+      ],
+      "ttl_observado": 64,
+      "puertos": [
+        {
+          "numero": 22,
+          "protocolo": "tcp",
+          "estado": "abierto",
+          "tecnica": "syn",
+          "servicio": {
+            "nombre": "OpenSSH",
+            "version": "4.7p1",
+            "banner_bruto": "SSH-2.0-OpenSSH_4.7p1 Debian-8ubuntu1\n",
+            "cabeceras": {}
+          },
+          "latencia_ms": 58.95
+        },
+        {
+          "numero": 80,
+          "protocolo": "tcp",
+          "estado": "abierto",
+          "tecnica": "syn",
+          "servicio": {
+            "nombre": "Apache",
+            "version": "2.2.8",
+            "banner_bruto": "HTTP/1.1 200 OK\r\nDate: Sat, 22 Aug 2026 23:17:46 GMT\r\nServer: Apache/2.2.8 (Ubuntu) DAV/2\r\nX-Powered-By: PHP/5.2.4-2ubuntu5.10\r\nContent-Length: 891\r\nConnection: close\r\nContent-Type: text/html\r\n\r\n<html><head><title>Metasploitable2 - Linux</title></head><body>\n<pre>\n\n                _                  _       _ _        _     _      ____  \n _ __ ___   ___| |_ __ _ ___ _ __ | | ___ (_) |_ __ _| |__ | | ___|___ \\ \n| '_ ` _ \\ / _ \\ __/ _` / __| '_ \\| |/ _ \\| | __/ _` | '_ \\| |/ _ \\ __) |\n| | | | | |  __/ || (_| \\__ \\ |_) | | (_) | | || (_| | |_) | |  __// __/ \n|_| |_| |_|\\___|\\__\\__,_|___/ .__/|_|\\___/|_|\\__\\__,_|_.__/|_|\\___|_____|\n                            |_|                                          \n\n\nWarning: Never expose this VM to an untrusted network!\n\nContact: msfdev[at]metasploit.com\n\nLogin with msfadmin/msfadmin to get started\n\n\n</pre>\n<ul>\n<li><a href=\"/twiki/\">TWiki</a></li>\n<li><a href=\"/phpMyAdmin/\">phpMyAdmin</a></li>\n<li><a href=\"/mutillidae/\">Mutillidae</a></li>\n<li><a href=\"/dvwa/\">DVWA</a></l",
+            "cabeceras": {
+              "date": "Sat, 22 Aug 2026 23:17:46 GMT",
+              "server": "Apache/2.2.8 (Ubuntu) DAV/2",
+              "x-powered-by": "PHP/5.2.4-2ubuntu5.10",
+              "content-length": "891",
+              "connection": "close",
+              "content-type": "text/html"
+            }
+          },
+          "latencia_ms": 58.95
+        },
+        {
+          "numero": 135,
+          "protocolo": "tcp",
+          "estado": "cerrado",
+          "tecnica": "syn",
+          "servicio": null,
+          "latencia_ms": 58.95
+        },
+        {
+          "numero": 139,
+          "protocolo": "tcp",
+          "estado": "abierto",
+          "tecnica": "syn",
+          "servicio": null,
+          "latencia_ms": 58.95
+        },
+        {
+          "numero": 443,
+          "protocolo": "tcp",
+          "estado": "cerrado",
+          "tecnica": "syn",
+          "servicio": null,
+          "latencia_ms": 58.95
+        },
+        {
+          "numero": 445,
+          "protocolo": "tcp",
+          "estado": "abierto",
+          "tecnica": "syn",
+          "servicio": null,
+          "latencia_ms": 58.95
+        },
+        {
+          "numero": 49664,
+          "protocolo": "tcp",
+          "estado": "cerrado",
+          "tecnica": "syn",
+          "servicio": null,
+          "latencia_ms": 58.95
+        }
+      ],
+      "so": {
+        "familia": "linux",
+        "confianza": 0.571,
+        "senales": {
+          "puerto_135": "linux",
+          "efimeros": "linux",
+          "ttl": "64 (icmp) → linux",
+          "opciones_tcp": "MSS, NOP, NOP, SAckOK, NOP, WScale → windows",
+          "timestamps": "ausentes → windows",
+          "ventana": "5840 → desconocida"
+        }
+      }
+    },
+    {
+      "direccion": "192.168.56.30",
+      "activo": false,
+      "mac": null,
+      "fabricante": null,
+      "tecnicas_respondidas": [],
+      "ttl_observado": null,
+      "puertos": [],
+      "so": null
+    },
+    {
+      "direccion": "192.168.56.40",
+      "activo": true,
+      "mac": null,
+      "fabricante": null,
+      "tecnicas_respondidas": [
+        "tcp"
+      ],
+      "ttl_observado": 128,
+      "puertos": [
+        {
+          "numero": 22,
+          "protocolo": "tcp",
+          "estado": "cerrado",
+          "tecnica": "syn",
+          "servicio": null,
+          "latencia_ms": 67.28
+        },
+        {
+          "numero": 80,
+          "protocolo": "tcp",
+          "estado": "cerrado",
+          "tecnica": "syn",
+          "servicio": null,
+          "latencia_ms": 67.28
+        },
+        {
+          "numero": 135,
+          "protocolo": "tcp",
+          "estado": "abierto",
+          "tecnica": "syn",
+          "servicio": null,
+          "latencia_ms": 67.28
+        },
+        {
+          "numero": 139,
+          "protocolo": "tcp",
+          "estado": "abierto",
+          "tecnica": "syn",
+          "servicio": {
+            "nombre": null,
+            "version": null,
+            "banner_bruto": "\u0000\u0000\u0001",
+            "cabeceras": {}
+          },
+          "latencia_ms": 67.28
+        },
+        {
+          "numero": 443,
+          "protocolo": "tcp",
+          "estado": "cerrado",
+          "tecnica": "syn",
+          "servicio": null,
+          "latencia_ms": 67.28
+        },
+        {
+          "numero": 445,
+          "protocolo": "tcp",
+          "estado": "abierto",
+          "tecnica": "syn",
+          "servicio": null,
+          "latencia_ms": 67.28
+        },
+        {
+          "numero": 49664,
+          "protocolo": "tcp",
+          "estado": "abierto",
+          "tecnica": "syn",
+          "servicio": null,
+          "latencia_ms": 67.28
+        }
+      ],
+      "so": {
+        "familia": "windows",
+        "confianza": 1.0,
+        "senales": {
+          "puerto_135": "windows",
+          "efimeros": "windows",
+          "ttl": "128 (icmp) → windows",
+          "opciones_tcp": "MSS, NOP, WScale, NOP, NOP, SAckOK → windows",
+          "timestamps": "ausentes → windows",
+          "ventana": "65535 → windows"
+        }
+      }
+    }
+  ],
+  "inicio": "2026-08-22T23:26:42.319421+00:00",
+  "fin": "2026-08-22T23:26:48.807792+00:00",
+  "parametros": {
+    "objetivos": 3,
+    "puertos": 7,
+    "protocolo": "tcp",
+    "tecnicas_descubrimiento": [
+      "tcp"
+    ],
+    "tecnica_escaneo": "syn",
+    "trabajadores": 50,
+    "trabajadores_fingerprint": 10,
+    "espera_s": 2.0,
+    "omitir_descubrimiento": false,
+    "puerto_ping_tcp": 80
+  },
+  "duracion_s": 6.488371
+}

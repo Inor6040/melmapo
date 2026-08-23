@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.99 scan initiated Sat Aug 22 21:15:52 2026 as: /usr/lib/nmap/nmap -sT -&#45;send-ip -oX mediciones/20260822_nmap_connect.xml -p 22,80,135,139,443,445,49664 192.168.56.20 192.168.56.30 192.168.56.40 -->
+<nmaprun scanner="nmap" args="/usr/lib/nmap/nmap -sT -&#45;send-ip -oX mediciones/20260822_nmap_connect.xml -p 22,80,135,139,443,445,49664 192.168.56.20 192.168.56.30 192.168.56.40" start="1787447752" startstr="Sat Aug 22 21:15:52 2026" version="7.99" xmloutputversion="1.05">
+<scaninfo type="connect" protocol="tcp" numservices="7" services="22,80,135,139,443,445,49664"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="192.168.56.30" addrtype="ipv4"/>
+<address addr="00:0C:29:01:3F:68" addrtype="mac" vendor="VMware"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="192.168.56.40" addrtype="ipv4"/>
+<address addr="00:0C:29:5F:57:57" addrtype="mac" vendor="VMware"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="192.168.56.20" addrtype="ipv4"/>
+<address addr="00:0C:29:20:B5:39" addrtype="mac" vendor="VMware"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<host starttime="1787447752" endtime="1787447752"><status state="up" reason="echo-reply" reason_ttl="64"/>
+<address addr="192.168.56.20" addrtype="ipv4"/>
+<address addr="00:0C:29:20:B5:39" addrtype="mac" vendor="VMware"/>
+<hostnames>
+</hostnames>
+<ports><port protocol="tcp" portid="22"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="ssh" method="table" conf="3"/></port>
+<port protocol="tcp" portid="80"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" method="table" conf="3"/></port>
+<port protocol="tcp" portid="135"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="msrpc" method="table" conf="3"/></port>
+<port protocol="tcp" portid="139"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="netbios-ssn" method="table" conf="3"/></port>
+<port protocol="tcp" portid="443"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="https" method="table" conf="3"/></port>
+<port protocol="tcp" portid="445"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="microsoft-ds" method="table" conf="3"/></port>
+<port protocol="tcp" portid="49664"><state state="closed" reason="conn-refused" reason_ttl="0"/></port>
+</ports>
+<times srtt="315" rttvar="714" to="100000"/>
+</host>
+<host starttime="1787447752" endtime="1787447754"><status state="up" reason="echo-reply" reason_ttl="64"/>
+<address addr="192.168.56.30" addrtype="ipv4"/>
+<address addr="00:0C:29:01:3F:68" addrtype="mac" vendor="VMware"/>
+<hostnames>
+</hostnames>
+<ports><port protocol="tcp" portid="22"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="ssh" method="table" conf="3"/></port>
+<port protocol="tcp" portid="80"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="http" method="table" conf="3"/></port>
+<port protocol="tcp" portid="135"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="msrpc" method="table" conf="3"/></port>
+<port protocol="tcp" portid="139"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="netbios-ssn" method="table" conf="3"/></port>
+<port protocol="tcp" portid="443"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="https" method="table" conf="3"/></port>
+<port protocol="tcp" portid="445"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="microsoft-ds" method="table" conf="3"/></port>
+<port protocol="tcp" portid="49664"><state state="closed" reason="conn-refused" reason_ttl="0"/></port>
+</ports>
+<times srtt="317" rttvar="989" to="100000"/>
+</host>
+<host starttime="1787447752" endtime="1787447752"><status state="up" reason="echo-reply" reason_ttl="128"/>
+<address addr="192.168.56.40" addrtype="ipv4"/>
+<address addr="00:0C:29:5F:57:57" addrtype="mac" vendor="VMware"/>
+<hostnames>
+</hostnames>
+<ports><port protocol="tcp" portid="22"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="ssh" method="table" conf="3"/></port>
+<port protocol="tcp" portid="80"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="http" method="table" conf="3"/></port>
+<port protocol="tcp" portid="135"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="msrpc" method="table" conf="3"/></port>
+<port protocol="tcp" portid="139"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="netbios-ssn" method="table" conf="3"/></port>
+<port protocol="tcp" portid="443"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="https" method="table" conf="3"/></port>
+<port protocol="tcp" portid="445"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="microsoft-ds" method="table" conf="3"/></port>
+<port protocol="tcp" portid="49664"><state state="open" reason="syn-ack" reason_ttl="0"/></port>
+</ports>
+<times srtt="276" rttvar="779" to="100000"/>
+</host>
+<runstats><finished time="1787447754" timestr="Sat Aug 22 21:15:54 2026" summary="Nmap done at Sat Aug 22 21:15:54 2026; 3 IP addresses (3 hosts up) scanned in 1.81 seconds" elapsed="1.81" exit="success"/><hosts up="3" down="0" total="3"/>
+</runstats>
+</nmaprun>

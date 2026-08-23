@@ -1,0 +1,85 @@
+{
+  "hosts": [
+    {
+      "direccion": "192.168.56.30",
+      "activo": true,
+      "mac": null,
+      "fabricante": null,
+      "tecnicas_respondidas": [],
+      "ttl_observado": null,
+      "puertos": [
+        {
+          "numero": 22,
+          "protocolo": "tcp",
+          "estado": "no filtrado",
+          "tecnica": "ack",
+          "servicio": null,
+          "latencia_ms": 2111.32
+        },
+        {
+          "numero": 80,
+          "protocolo": "tcp",
+          "estado": "filtrado",
+          "tecnica": "ack",
+          "servicio": null,
+          "latencia_ms": 2111.32
+        },
+        {
+          "numero": 135,
+          "protocolo": "tcp",
+          "estado": "no filtrado",
+          "tecnica": "ack",
+          "servicio": null,
+          "latencia_ms": 2111.32
+        },
+        {
+          "numero": 139,
+          "protocolo": "tcp",
+          "estado": "no filtrado",
+          "tecnica": "ack",
+          "servicio": null,
+          "latencia_ms": 2111.32
+        },
+        {
+          "numero": 443,
+          "protocolo": "tcp",
+          "estado": "no filtrado",
+          "tecnica": "ack",
+          "servicio": null,
+          "latencia_ms": 2111.32
+        },
+        {
+          "numero": 445,
+          "protocolo": "tcp",
+          "estado": "no filtrado",
+          "tecnica": "ack",
+          "servicio": null,
+          "latencia_ms": 2111.32
+        },
+        {
+          "numero": 49664,
+          "protocolo": "tcp",
+          "estado": "no filtrado",
+          "tecnica": "ack",
+          "servicio": null,
+          "latencia_ms": 2111.32
+        }
+      ],
+      "so": null
+    }
+  ],
+  "inicio": "2026-08-23T12:27:13.396869+00:00",
+  "fin": "2026-08-23T12:27:15.768749+00:00",
+  "parametros": {
+    "objetivos": 1,
+    "puertos": 7,
+    "protocolo": "tcp",
+    "tecnicas_descubrimiento": [],
+    "tecnica_escaneo": "ack",
+    "trabajadores": 50,
+    "trabajadores_fingerprint": 10,
+    "espera_s": 2.0,
+    "omitir_descubrimiento": true
+  },
+  "duracion_s": 2.37188
+}

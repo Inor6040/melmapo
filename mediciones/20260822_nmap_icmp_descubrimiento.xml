@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.99 scan initiated Sat Aug 22 19:26:36 2026 as: /usr/lib/nmap/nmap -sn -PE -&#45;send-ip -oX mediciones/20260822_nmap_icmp_descubrimiento.xml 192.168.56.20 192.168.56.30 192.168.56.40 -->
+<nmaprun scanner="nmap" args="/usr/lib/nmap/nmap -sn -PE -&#45;send-ip -oX mediciones/20260822_nmap_icmp_descubrimiento.xml 192.168.56.20 192.168.56.30 192.168.56.40" start="1787441196" startstr="Sat Aug 22 19:26:36 2026" version="7.99" xmloutputversion="1.05">
+<verbose level="0"/>
+<debugging level="0"/>
+<host><status state="up" reason="echo-reply" reason_ttl="64"/>
+<address addr="192.168.56.20" addrtype="ipv4"/>
+<address addr="00:0C:29:20:B5:39" addrtype="mac" vendor="VMware"/>
+<hostnames>
+</hostnames>
+<times srtt="2005" rttvar="5000" to="100000"/>
+</host>
+<host><status state="up" reason="echo-reply" reason_ttl="64"/>
+<address addr="192.168.56.30" addrtype="ipv4"/>
+<address addr="00:0C:29:01:3F:68" addrtype="mac" vendor="VMware"/>
+<hostnames>
+</hostnames>
+<times srtt="2101" rttvar="5000" to="100000"/>
+</host>
+<host><status state="up" reason="echo-reply" reason_ttl="128"/>
+<address addr="192.168.56.40" addrtype="ipv4"/>
+<address addr="00:0C:29:5F:57:57" addrtype="mac" vendor="VMware"/>
+<hostnames>
+</hostnames>
+<times srtt="2012" rttvar="5000" to="100000"/>
+</host>
+<runstats><finished time="1787441196" timestr="Sat Aug 22 19:26:36 2026" summary="Nmap done at Sat Aug 22 19:26:36 2026; 3 IP addresses (3 hosts up) scanned in 0.57 seconds" elapsed="0.57" exit="success"/><hosts up="3" down="0" total="3"/>
+</runstats>
+</nmaprun>
