@@ -1,0 +1,20 @@
+Starting Nmap 7.99 ( https://nmap.org ) at 2026-08-24 07:46 -0400
+SENT (0.0191s) ICMP [192.168.56.10 > 192.168.56.20 Echo request (type=8/code=0) id=49282 seq=0] IP [ttl=48 id=60082 iplen=28 ]
+SENT (0.0191s) TCP 192.168.56.10:34141 > 192.168.56.20:443 S ttl=38 id=50959 iplen=44  seq=1391793525 win=1024 <mss 1460>
+SENT (0.0191s) TCP 192.168.56.10:34141 > 192.168.56.20:80 A ttl=47 id=19272 iplen=40  seq=0 win=1024 
+SENT (0.0191s) ICMP [192.168.56.10 > 192.168.56.20 Timestamp request (type=13/code=0) id=61275 seq=0 orig=0 recv=0 trans=0] IP [ttl=41 id=60931 iplen=40 ]
+RCVD (0.0194s) ICMP [192.168.56.20 > 192.168.56.10 Echo reply (type=0/code=0) id=49282 seq=0] IP [ttl=64 id=5414 iplen=28 ]
+NSOCK INFO [0.0580s] nsock_iod_new2(): nsock_iod_new (IOD #1)
+NSOCK INFO [0.0590s] nsock_connect_udp(): UDP connection requested to 192.168.73.2:53 (IOD #1) EID 8
+NSOCK INFO [0.0590s] nsock_trace_handler_callback(): Callback: CONNECT SUCCESS for EID 8 [192.168.73.2:53]
+NSOCK INFO [0.0590s] nsock_read(): Read request from IOD #1 [192.168.73.2:53] (timeout: -1ms) EID 18
+NSOCK INFO [0.0590s] nsock_write(): Write request for 44 bytes to IOD #1 EID 27 [192.168.73.2:53]
+NSOCK INFO [0.0590s] nsock_trace_handler_callback(): Callback: WRITE SUCCESS for EID 27 [192.168.73.2:53]
+NSOCK INFO [0.0750s] nsock_trace_handler_callback(): Callback: READ SUCCESS for EID 18 [192.168.73.2:53] (121 bytes)
+NSOCK INFO [0.0750s] nsock_read(): Read request from IOD #1 [192.168.73.2:53] (timeout: -1ms) EID 34
+NSOCK INFO [0.5580s] nsock_iod_delete(): nsock_iod_delete (IOD #1)
+NSOCK INFO [0.5580s] nevent_delete(): nevent_delete on event #34 (type READ)
+Nmap scan report for 192.168.56.20
+Host is up (0.00043s latency).
+MAC Address: 00:0C:29:20:B5:39 (VMware)
+Nmap done: 1 IP address (1 host up) scanned in 0.58 seconds

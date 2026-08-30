@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.99 scan initiated Mon Aug 24 09:03:48 2026 as: /usr/lib/nmap/nmap -sn -PS80 -&#45;send-ip -oX mediciones/20260824_nmap_tcp_descubrimiento_p80.xml 192.168.56.20 192.168.56.30 192.168.56.40 -->
+<nmaprun scanner="nmap" args="/usr/lib/nmap/nmap -sn -PS80 -&#45;send-ip -oX mediciones/20260824_nmap_tcp_descubrimiento_p80.xml 192.168.56.20 192.168.56.30 192.168.56.40" start="1787576628" startstr="Mon Aug 24 09:03:48 2026" version="7.99" xmloutputversion="1.05">
+<verbose level="0"/>
+<debugging level="0"/>
+<host><status state="up" reason="syn-ack" reason_ttl="64"/>
+<address addr="192.168.56.20" addrtype="ipv4"/>
+<address addr="00:0C:29:20:B5:39" addrtype="mac" vendor="VMware"/>
+<hostnames>
+</hostnames>
+<times srtt="231" rttvar="5000" to="100000"/>
+</host>
+<host><status state="up" reason="reset" reason_ttl="128"/>
+<address addr="192.168.56.40" addrtype="ipv4"/>
+<address addr="00:0C:29:5F:57:57" addrtype="mac" vendor="VMware"/>
+<hostnames>
+</hostnames>
+<times srtt="270" rttvar="5000" to="100000"/>
+</host>
+<runstats><finished time="1787576629" timestr="Mon Aug 24 09:03:49 2026" summary="Nmap done at Mon Aug 24 09:03:49 2026; 3 IP addresses (2 hosts up) scanned in 0.79 seconds" elapsed="0.79" exit="success"/><hosts up="2" down="1" total="3"/>
+</runstats>
+</nmaprun>
