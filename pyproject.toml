@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "GPL-3.0-only" }
 authors = [
-    { name = "Inor0640" }
+    { name = "Inor6040" }
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
