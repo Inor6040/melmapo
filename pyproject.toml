@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "melmapo"
-version = "0.1.0"
+version = "1.0.0"
 description = "Herramienta de enumeracion y escaneo para la fase de reconocimiento en pentesting interno (TFM)"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -13,7 +13,7 @@ authors = [
     { name = "Inor6040" }
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Information Technology",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3.11",
